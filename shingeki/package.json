@@ -10,7 +10,7 @@
     "node": "node --import tsx src/cli.ts node",
     "start": "node --import tsx src/cli.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/genome/evaluate.test.ts src/genome/mutation.test.ts src/coordination/protocol.test.ts src/coordination/hub.integration.test.ts src/orchestrator/resume.test.ts src/infra/checkpoint.test.ts"
+    "test": "node --import tsx --test src/genome/evaluate.test.ts src/genome/mutation.test.ts src/coordination/protocol.test.ts src/coordination/hub.integration.test.ts src/orchestrator/resume.test.ts src/infra/checkpoint.test.ts src/infra/lineage-store.test.ts"
   },
   "dependencies": {
     "@0gfoundation/0g-ts-sdk": "^1.2.6",

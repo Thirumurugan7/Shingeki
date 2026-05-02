@@ -1,14 +1,12 @@
 #!/usr/bin/env node
 /**
  * Shingeki CLI — demo [--mesh] [--preset gpu|japan] | hub | node
- *
- * Demo narrative: distributed mesh → parallel competition (step 1) → live genome evolution
- * → per-step 0G verifiable traces + TEE line.
  */
 import { config } from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
+import { exec } from 'node:child_process';
 import { parse as parseYaml } from 'yaml';
 import { ethers } from 'ethers';
 
@@ -39,6 +37,9 @@ import {
   writeCheckpointAtomic,
   type DemoCheckpoint,
 } from './infra/checkpoint.js';
+import { addLineageEntry } from './infra/lineage-store.js';
+import { routerInfer } from './og/compute-router.js';
+import type { NodeCapabilities } from './coordination/protocol.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '../..');
@@ -77,8 +78,7 @@ function parseDemoArgs(argv: string[]): {
     } else if (a === '--task-id' && argv[i + 1]) {
       taskIdArg = argv[i + 1]!;
       i += 1;
-    } else if (a.startsWith('-')) out.push(a);
-    else out.push(a);
+    } else out.push(a);
     i += 1;
   }
   return { mesh, preset, resumeTaskId, taskIdArg, rest: out };
@@ -93,7 +93,6 @@ function taskSummary(preset: 'gpu' | 'japan'): string {
   return preset === 'japan' ? JAPAN_TRIP_GOAL : GPU_LLM_RESEARCH_GOAL;
 }
 
-/** Prominent [Verification] block for judges + crypto-native story. */
 async function verifyStepOnChain(
   wallet: ethers.Wallet | null,
   stepDisplay: number,
@@ -102,12 +101,13 @@ async function verifyStepOnChain(
 ) {
   const tee =
     (result.teeTrace as { tee_verified?: boolean } | undefined)?.tee_verified === true;
+  const evalTee = result.evalResult?.tee_verified === true;
 
   if (!wallet) {
     console.log('');
     console.log('[Verification]');
     console.log(`  Step ${stepDisplay} — 0G Log Store skipped (set PRIVATE_KEY in .env)`);
-    console.log(`  Router x_0g_trace / TEE verified: ${tee}`);
+    console.log(`  Router TEE: ${tee}  Eval TEE: ${evalTee}  Eval path: ${result.evalResult?.path ?? 'n/a'}`);
     return;
   }
 
@@ -120,6 +120,7 @@ async function verifyStepOnChain(
     output: result.output.slice(0, 2000),
     signature: tee ? 'tee:router' : undefined,
     timestamp: Date.now(),
+    rootHash: undefined,
   };
 
   try {
@@ -127,13 +128,15 @@ async function verifyStepOnChain(
     console.log('');
     console.log('[Verification]');
     console.log(`  Step ${stepDisplay} logged to 0G`);
-    console.log(`  Trace ID: ${rootHash}`);
-    console.log(`  TEE Verified: ${tee}`);
+    console.log(`  Trace ID   : ${rootHash}`);
+    console.log(`  Router TEE : ${tee}`);
+    console.log(`  Eval score : ${result.evalResult?.score?.toFixed(2) ?? 'n/a'} (${result.evalResult?.path ?? 'n/a'})`);
+    console.log(`  Eval TEE   : ${evalTee}`);
   } catch (e: unknown) {
     console.log('');
     console.log('[Verification]');
     console.log(`  Step ${stepDisplay} — upload failed: ${(e as Error).message}`);
-    console.log(`  Router TEE (from response): ${tee}`);
+    console.log(`  Router TEE: ${tee}  Eval path: ${result.evalResult?.path ?? 'n/a'}`);
   }
 }
 
@@ -153,24 +156,10 @@ async function cmdDemo() {
   let cp: DemoCheckpoint | null = null;
   if (resumeTaskId) {
     cp = readCheckpoint(checkpointDir, resumeTaskId);
-    if (!cp) {
-      console.error(`No checkpoint for "${resumeTaskId}" under ${checkpointDir}`);
-      process.exit(1);
-    }
-    if (cp.preset !== preset) {
-      console.error(`Checkpoint preset ${cp.preset} does not match --preset ${preset}`);
-      process.exit(1);
-    }
-    if (cp.mesh !== mesh) {
-      console.error(`Checkpoint mesh=${cp.mesh} does not match current mesh flag (${mesh})`);
-      process.exit(1);
-    }
-    if (cp.results.length !== cp.nextStepIndex) {
-      console.error(
-        'Checkpoint corrupt: results.length must equal nextStepIndex (partial step recovery is not supported)',
-      );
-      process.exit(1);
-    }
+    if (!cp) { console.error(`No checkpoint for "${resumeTaskId}" under ${checkpointDir}`); process.exit(1); }
+    if (cp.preset !== preset) { console.error(`Checkpoint preset ${cp.preset} does not match --preset ${preset}`); process.exit(1); }
+    if (cp.mesh !== mesh) { console.error(`Checkpoint mesh=${cp.mesh} does not match current mesh flag (${mesh})`); process.exit(1); }
+    if (cp.results.length !== cp.nextStepIndex) { console.error('Checkpoint corrupt: results.length must equal nextStepIndex'); process.exit(1); }
   }
 
   const cfgPath = path.join(shingekiRoot, 'agentmesh.example.yaml');
@@ -186,9 +175,7 @@ async function cmdDemo() {
 
   const plan = buildPlan(taskId, preset);
   const summary = cp?.summary ?? (taskOverride || taskSummary(preset));
-
-  const evolveThreshold =
-    cp?.evolveThreshold ?? Number(process.env.SHINGEKI_EVOLVE_THRESHOLD ?? '0.55');
+  const evolveThreshold = cp?.evolveThreshold ?? Number(process.env.SHINGEKI_EVOLVE_THRESHOLD ?? '0.55');
 
   const rollingResults: StepResult[] = cp ? [...cp.results] : [];
 
@@ -196,15 +183,11 @@ async function cmdDemo() {
     rollingResults[stepIndex] = result;
     const slice = rollingResults.slice(0, stepIndex + 1);
     const payload: DemoCheckpoint = {
-      version: 1,
-      taskId,
-      preset,
-      mesh,
+      version: 1, taskId, preset, mesh,
       nextStepIndex: stepIndex + 1,
       results: slice,
       genome: genomeRef.current,
-      evolveThreshold,
-      summary,
+      evolveThreshold, summary,
       updatedAt: Date.now(),
     };
     writeCheckpointAtomic(checkpointDir, payload);
@@ -222,8 +205,8 @@ async function cmdDemo() {
   console.log();
 
   const nodes: NodeCapability[] = [
-    { id: 'node-1', capabilities: ['llm', 'executor'], latencyMs: 120, stake: 10 },
-    { id: 'node-2', capabilities: ['llm', 'critic'], latencyMs: 200, stake: 10 },
+    { id: 'node-1', capabilities: ['llm', 'executor'], specialization: ['research'], latencyMs: 120, stake: 10 },
+    { id: 'node-2', capabilities: ['llm', 'critic'],   specialization: ['planning'], latencyMs: 200, stake: 10 },
   ];
 
   const log = (line: string) => console.log(line);
@@ -253,6 +236,14 @@ async function cmdDemo() {
     evolution: {
       ref: genomeRef,
       threshold: evolveThreshold,
+      taskDescription: summary,
+      onLineageEntry: (entry: Parameters<typeof addLineageEntry>[0]) => {
+        addLineageEntry(entry);
+        // In mesh mode, also send to hub so the viewer sees it.
+        if (mesh && meshWs && meshWs.readyState === 1 /* OPEN */) {
+          meshWs.send(JSON.stringify({ type: 'GENOME_LINEAGE', payload: entry }));
+        }
+      },
     },
     resume: resumeOpts,
     afterEachStep: async ({ stepIndex, result }: { stepIndex: number; result: StepResult }) => {
@@ -261,20 +252,30 @@ async function cmdDemo() {
     },
   };
 
+  // meshWs is set if --mesh mode; used by onLineageEntry closure above.
+  let meshWs: import('ws').WebSocket | null = null;
+
   if (mesh) {
     assertMeshClientProductionSafe();
     const hubUrl = hubUrlFromEnv();
     const minNodes = Math.max(2, cfg.mesh?.min_nodes ?? 2);
     log(`[Orchestrator] connecting hub ${hubUrl} (need ${minNodes} workers)`);
-    const { ws, workerIds } = await openOrchestratorSession(hubUrl, minNodes, 120_000, log);
+    const { ws, workerIds, capabilities } = await openOrchestratorSession(hubUrl, minNodes, 120_000, log);
+    meshWs = ws;
 
-    // Build NodeCapability from actual registered worker IDs — not hardcoded names.
-    const roles = ['executor', 'critic'];
-    const meshNodes: NodeCapability[] = workerIds.map((id, i) => ({
-      id,
-      capabilities: ['llm', roles[i % roles.length]!],
-    }));
-    log(`[Orchestrator] routing over: ${meshNodes.map(n => n.id).join(', ')}`);
+    // Build NodeCapability from actual registered IDs + advertised capabilities.
+    const defaultRoles = ['executor', 'critic'];
+    const meshNodes: NodeCapability[] = workerIds.map((id, i) => {
+      const cap = capabilities[id];
+      return {
+        id,
+        capabilities: ['llm', cap?.role ?? defaultRoles[i % defaultRoles.length]!],
+        role: cap?.role,
+        specialization: cap?.specialization ?? [],
+        latencyMs: cap?.latency_ms,
+      };
+    });
+    log(`[Orchestrator] routing over: ${meshNodes.map(n => `${n.id}(${n.role ?? 'general'})`).join(', ')}`);
 
     const orch = new MeshOrchestrator(meshNodes);
     const exec = createMeshStepExecutor(ws, () => genomeRef.current, { stepTimeoutMs: 240_000 });
@@ -284,12 +285,10 @@ async function cmdDemo() {
       log(`[${args.node.id}] calling 0G Compute (${genomeRef.current.model})`);
       const r = await exec(args);
       log(`[${args.node.id}] result received (latency: ${(r.latencyMs / 1000).toFixed(1)}s)`);
-      log(`[${args.node.id}] STEP_RESULT received at orchestrator`);
       return r;
     };
 
     const results = await orch.executePlan(plan, wrapMesh, planOpts);
-
     await finalize(results, genomeRef.current, taskId);
     ws.close();
     return;
@@ -297,12 +296,7 @@ async function cmdDemo() {
 
   const orch = new MeshOrchestrator(nodes);
 
-  const localExec = async (args: {
-    node: NodeCapability;
-    step: Step;
-    priorContext: string;
-    stepIndex: number;
-  }) => {
+  const localExec = async (args: { node: NodeCapability; step: Step; priorContext: string; stepIndex: number }) => {
     const label = args.step.title ?? args.step.id;
     log(`[${args.node.id}] executing step: ${label}`);
     log(`[${args.node.id}] calling 0G Compute (${genomeRef.current.model})`);
@@ -313,7 +307,6 @@ async function cmdDemo() {
   };
 
   const results = await orch.executePlan(plan, localExec, planOpts);
-
   await finalize(results, genomeRef.current, taskId);
 }
 
@@ -324,11 +317,7 @@ async function finalize(results: StepResult[], genome: Genome, taskId: string) {
       const wallet = new ethers.Wallet(pk, new ethers.JsonRpcProvider(loadKvEnv().rpcUrl));
       const kv = new ShingekiKv(wallet, loadKvEnv());
       const ver = Date.now();
-      await kv.setJson(
-        `mesh:genome:${taskId}`,
-        { genomeId: genome.id, taskId, stepCount: results.length },
-        ver,
-      );
+      await kv.setJson(`mesh:genome:${taskId}`, { genomeId: genome.id, taskId, stepCount: results.length }, ver);
       console.log('\n[0G KV] genome checkpoint written version', ver);
     } catch (e: unknown) {
       console.warn('[0G KV] skip:', (e as Error).message);
@@ -360,16 +349,23 @@ async function cmdHub() {
   }
   const h = tls ? 'https' : 'http';
   const w = tls ? 'wss' : 'ws';
+  const viewerUrl = `${h}://127.0.0.1:${port}/viewer`;
   console.log(`Shingeki hub listening on ${w}://127.0.0.1:${port}`);
-  console.log(
-    `${h}://127.0.0.1:${port}/health   ${h}://127.0.0.1:${port}/ready   Prometheus ${h}://127.0.0.1:${port}/metrics   JSON ${h}://127.0.0.1:${port}/status`,
-  );
+  console.log(`${h}://127.0.0.1:${port}/health   /ready   /metrics   /status   /lineage`);
+  console.log(`Genome lineage viewer: ${viewerUrl}`);
   console.log(
     rawTok
       ? 'Hub auth: enabled — clients must set SHINGEKI_HUB_TOKEN (not logged)'
       : 'Hub auth: disabled — set SHINGEKI_HUB_TOKEN for shared-secret mode',
   );
   console.log('Start workers: NODE_ID=node-1 npm run node   (separate terminals)');
+
+  // Auto-open viewer in interactive sessions.
+  if (process.stdout.isTTY && !process.env.CI) {
+    setTimeout(() => {
+      exec(`open "${viewerUrl}" 2>/dev/null || xdg-open "${viewerUrl}" 2>/dev/null || true`, () => {});
+    }, 600);
+  }
 
   const shutdown = async () => {
     if (closer) await closer();
@@ -379,7 +375,7 @@ async function cmdHub() {
   process.once('SIGTERM', () => void shutdown());
 }
 
-function cmdNode() {
+async function cmdNode() {
   assertMeshClientProductionSafe();
   const cfgPath = path.join(shingekiRoot, 'agentmesh.example.yaml');
   const cfg = loadAgentMesh(cfgPath);
@@ -391,12 +387,33 @@ function cmdNode() {
     process.env.SHINGEKI_NODE_ID ??
     `node-${Math.random().toString(36).slice(2, 8)}`;
 
-  const host = runWorkerHost(url, nodeId, genome, ['llm'], console.log);
-  console.log(`Worker ${nodeId} → ${url}`);
-  const stop = () => {
-    host.close();
-    process.exit(0);
+  const role = (process.env.NODE_ROLE ?? 'general') as NodeCapabilities['role'];
+  const specialization = (process.env.NODE_SPECIALIZATION ?? '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+  const costWeight = parseFloat(process.env.NODE_COST_WEIGHT ?? '1.0');
+
+  // Warm-up inference call to measure self-reported latency.
+  let latencyMs = 500;
+  try {
+    const t0 = Date.now();
+    await routerInfer('ping', undefined, { max_tokens: 1 });
+    latencyMs = Date.now() - t0;
+  } catch {
+    // Warmup failure is non-fatal; use default.
+  }
+
+  const nodeCapabilities: NodeCapabilities = {
+    role,
+    latency_ms: latencyMs,
+    cost_weight: costWeight,
+    specialization,
   };
+
+  console.log(`Worker ${nodeId} → ${url}  role=${role} latency=${latencyMs}ms specialization=[${specialization.join(',')}]`);
+  const host = runWorkerHost(url, nodeId, genome, ['llm'], nodeCapabilities, console.log);
+  const stop = () => { host.close(); process.exit(0); };
   process.once('SIGINT', stop);
   process.once('SIGTERM', stop);
 }
@@ -405,19 +422,17 @@ async function main() {
   const cmd = process.argv[2] ?? 'demo';
   if (cmd === 'demo') await cmdDemo();
   else if (cmd === 'hub') await cmdHub();
-  else if (cmd === 'node') cmdNode();
+  else if (cmd === 'node') await cmdNode();
   else {
     console.log(`Usage: node --import tsx src/cli.ts <demo|hub|node> [demo flags]`);
-    console.log(`  demo                    GPU research (parallel step 1 + evolution + 0G verification)`);
-    console.log(`  demo --mesh             hub + workers (same)`);
-    console.log(`  demo --resume task-…    continue after crash (checkpoint in shingeki/.checkpoints)`);
-    console.log(`  demo --task-id ID       stable task id for checkpoints`);
-    console.log(`  SHINGEKI_EVOLVE_THRESHOLD=0.55   score below → genome mutates`);
+    console.log(`  demo                         GPU research (parallel step 1 + evolution + 0G verification)`);
+    console.log(`  demo --preset japan          Japan trip planning`);
+    console.log(`  demo --mesh                  hub + workers (same + lineage viewer)`);
+    console.log(`  demo --resume task-…         continue after crash`);
+    console.log(`  hub                          start hub + open genome lineage viewer`);
+    console.log(`  node                         start worker (NODE_ID, NODE_ROLE, NODE_SPECIALIZATION)`);
     process.exit(1);
   }
 }
 
-main().catch(e => {
-  console.error(e);
-  process.exit(1);
-});
+main().catch(e => { console.error(e); process.exit(1); });

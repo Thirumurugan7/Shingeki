@@ -1,5 +1,12 @@
 import type { MeshMessage } from '../types.js';
 
+export interface NodeCapabilities {
+  role: 'memory' | 'reasoning' | 'executor' | 'general';
+  latency_ms: number;
+  cost_weight: number;
+  specialization: string[];
+}
+
 export function parseMessage(raw: string): MeshMessage | null {
   try {
     const o = JSON.parse(raw) as MeshMessage;

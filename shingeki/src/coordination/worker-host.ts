@@ -1,8 +1,8 @@
 /**
- * Worker process — registers with hub, runs NodeRuntime on TASK_ASSIGN, returns STEP_RESULT.
+ * Worker process — registers with hub (with capabilities), runs NodeRuntime on TASK_ASSIGN.
  */
 import WebSocket from 'ws';
-import { encodeMessage, parseMessage } from './protocol.js';
+import { encodeMessage, parseMessage, type NodeCapabilities } from './protocol.js';
 import type { Genome } from '../genome/schema.js';
 import type { Step } from '../types.js';
 import { NodeRuntime } from '../node-runtime/runtime.js';
@@ -11,15 +11,19 @@ import {
   workerReconnectMaxAttempts,
 } from '../config/runtime-config.js';
 
-function nodeJoinPayload(nodeId: string, capabilities: string[]) {
+function nodeJoinPayload(
+  nodeId: string,
+  capabilities: string[],
+  nodeCapabilities?: NodeCapabilities,
+) {
   const t = process.env.SHINGEKI_HUB_TOKEN;
-  return t
+  const base = t
     ? { nodeId, capabilities, token: t }
     : { nodeId, capabilities };
+  return nodeCapabilities ? { ...base, nodeCapabilities } : base;
 }
 
 export interface WorkerHostHandle {
-  /** Stop reconnect loop and close socket */
   close: () => void;
 }
 
@@ -28,6 +32,7 @@ export function runWorkerHost(
   nodeId: string,
   genome: Genome,
   capabilities: string[] = ['llm'],
+  nodeCapabilities?: NodeCapabilities,
   log: (s: string) => void = console.log,
 ): WorkerHostHandle {
   let shuttingDown = false;
@@ -55,10 +60,7 @@ export function runWorkerHost(
         genome?: Genome;
       };
       const g = p.genome ?? genome;
-      const step: Step = {
-        id: p.stepId,
-        description: p.description,
-      };
+      const step: Step = { id: p.stepId, description: p.description };
 
       log(`[${nodeId}] executing step: ${p.title ?? p.stepId}`);
       log(`[${nodeId}] calling 0G Compute (${g.model})`);
@@ -113,8 +115,8 @@ export function runWorkerHost(
     ws = new WebSocket(hubUrl);
 
     ws.on('open', () => {
-      ws!.send(encodeMessage('NODE_JOIN', nodeJoinPayload(nodeId, capabilities)));
-      log(`[${nodeId}] registered with hub`);
+      ws!.send(encodeMessage('NODE_JOIN', nodeJoinPayload(nodeId, capabilities, nodeCapabilities)));
+      log(`[${nodeId}] registered with hub${nodeCapabilities ? ` (role=${nodeCapabilities.role} latency=${nodeCapabilities.latency_ms}ms)` : ''}`);
     });
 
     attachHandlers(ws);
@@ -126,11 +128,7 @@ export function runWorkerHost(
     close: () => {
       shuttingDown = true;
       clearReconnectTimer();
-      try {
-        ws?.close();
-      } catch {
-        /* ignore */
-      }
+      try { ws?.close(); } catch { /* ignore */ }
       ws = null;
     },
   };

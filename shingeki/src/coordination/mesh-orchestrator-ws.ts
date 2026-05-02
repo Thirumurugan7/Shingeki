@@ -2,7 +2,7 @@
  * Orchestrator WebSocket client — TASK_ASSIGN / STEP_RESULT with single routed listener.
  */
 import WebSocket from 'ws';
-import { encodeMessage, parseMessage } from './protocol.js';
+import { encodeMessage, parseMessage, type NodeCapabilities } from './protocol.js';
 import type { Genome } from '../genome/schema.js';
 import type { StepResult } from '../types.js';
 import type { StepExecutor } from '../orchestrator/orchestrator.js';
@@ -26,8 +26,8 @@ async function waitForWorkersRegistered(
   minWorkers: number,
   timeoutMs: number,
   log: (s: string) => void,
-): Promise<string[]> {
-  return new Promise<string[]>((resolve, reject) => {
+): Promise<{ workerIds: string[]; capabilities: Record<string, NodeCapabilities | undefined> }> {
+  return new Promise((resolve, reject) => {
     let settled = false;
 
     const failTimer = setTimeout(() => {
@@ -40,14 +40,15 @@ async function waitForWorkersRegistered(
     const onMsg = (buf: WebSocket.RawData) => {
       const msg = parseMessage(buf.toString());
       if (msg?.type === 'ORCH_WORKERS') {
-        const p = msg.payload as { workerIds?: string[] };
+        const p = msg.payload as { workerIds?: string[]; capabilities?: Record<string, NodeCapabilities | undefined> };
         const ids = p.workerIds ?? [];
+        const caps = p.capabilities ?? {};
         log(`[Orchestrator] workers online: ${ids.join(', ') || '(none)'}`);
         if (ids.length >= minWorkers && !settled) {
           settled = true;
           clearTimeout(failTimer);
           ws.off('message', onMsg);
-          resolve(ids);
+          resolve({ workerIds: ids, capabilities: caps });
         }
       }
     };
@@ -61,6 +62,8 @@ export interface OrchestratorSession {
   ws: WebSocket;
   /** Node IDs that were registered at the hub when the session was opened. */
   workerIds: string[];
+  /** Capabilities keyed by node ID (may be absent if worker didn't advertise). */
+  capabilities: Record<string, NodeCapabilities | undefined>;
 }
 
 /**
@@ -84,8 +87,8 @@ export async function openOrchestratorSession(
         ws!.once('open', () => res());
         ws!.once('error', rej);
       });
-      const workerIds = await waitForWorkersRegistered(ws, minWorkers, timeoutMs, log);
-      return { ws, workerIds };
+      const { workerIds, capabilities } = await waitForWorkersRegistered(ws, minWorkers, timeoutMs, log);
+      return { ws, workerIds, capabilities };
     } catch (e: unknown) {
       lastErr = e instanceof Error ? e : new Error(String(e));
       log(`[Orchestrator] hub connect/session attempt ${c + 1}/${attempts} failed: ${lastErr.message}`);

@@ -1,14 +1,19 @@
 /**
  * Coordination hub — HTTP observability + WebSocket routing (orchestrator ↔ workers).
+ * Routes: /health /ready /status /metrics /lineage /viewer  WS: /
  */
 import http from 'node:http';
 import https from 'node:https';
+import fs from 'node:fs';
+import path from 'node:path';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import type { IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, WebSocket } from 'ws';
-import { encodeMessage, parseMessage } from './protocol.js';
-import type { MeshMessage } from '../types.js';
+import { encodeMessage, parseMessage, type NodeCapabilities } from './protocol.js';
+import type { LineageEntry, MeshMessage } from '../types.js';
+import { addLineageEntry, getLineage } from '../infra/lineage-store.js';
 import { createLogger } from '../infra/logger.js';
 import {
   hubMaxPayloadBytes,
@@ -18,25 +23,29 @@ import {
 
 const log = createLogger('mesh-hub');
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const VIEWER_PATH = path.join(__dirname, '../viewer/index.html');
+
 export interface HubOptions {
   port: number;
-  /** If set, clients must send this token on ORCH_JOIN / NODE_JOIN payloads (never logged). */
   authToken?: string;
-  /** Override max WS frame size (default from env or 2 MiB). */
   maxPayloadBytes?: number;
-  /** Bind address (default 0.0.0.0 in production, 127.0.0.1 optional via env). */
   host?: string;
 }
 
 export interface HubListenResult {
   readonly httpServer: http.Server | https.Server;
   readonly tls: boolean;
-  /** Graceful close — drains HTTP + WS */
   close: () => Promise<void>;
 }
 
+interface WorkerEntry {
+  ws: WebSocket;
+  capabilities?: NodeCapabilities;
+}
+
 export class MeshHub {
-  private readonly workers = new Map<string, WebSocket>();
+  private readonly workers = new Map<string, WorkerEntry>();
   private orchWs: WebSocket | null = null;
   private wss: WebSocketServer | null = null;
   private httpServer: http.Server | https.Server | null = null;
@@ -90,8 +99,7 @@ export class MeshHub {
   private prometheusText(): string {
     const workerCount = this.workers.size;
     const orchUp = this.orchWs != null && this.orchWs.readyState === WebSocket.OPEN ? 1 : 0;
-    const instance =
-      process.env.SHINGEKI_HUB_INSTANCE_ID?.trim() || os.hostname();
+    const instance = process.env.SHINGEKI_HUB_INSTANCE_ID?.trim() || os.hostname();
     const lines: string[] = [
       '# HELP shingeki_hub_workers Connected mesh worker sockets',
       '# TYPE shingeki_hub_workers gauge',
@@ -114,18 +122,24 @@ export class MeshHub {
     return lines.join('\n');
   }
 
+  private orchWorkersPayload(): { workerIds: string[]; capabilities: Record<string, NodeCapabilities | undefined> } {
+    const caps: Record<string, NodeCapabilities | undefined> = {};
+    for (const [id, entry] of this.workers) {
+      caps[id] = entry.capabilities;
+    }
+    return { workerIds: [...this.workers.keys()], capabilities: caps };
+  }
+
   private notifyOrchestratorWorkers() {
     if (this.orchWs && this.orchWs.readyState === WebSocket.OPEN) {
-      this.orchWs.send(
-        encodeMessage('ORCH_WORKERS', { workerIds: [...this.workers.keys()] }),
-      );
+      this.orchWs.send(encodeMessage('ORCH_WORKERS', this.orchWorkersPayload()));
     }
   }
 
   private handleHttp(req: IncomingMessage, res: http.ServerResponse) {
-    const path = req.url?.split('?')[0] ?? '/';
+    const urlPath = req.url?.split('?')[0] ?? '/';
 
-    if (req.method === 'GET' && path === '/health') {
+    if (req.method === 'GET' && urlPath === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: 'ok', role: 'shingeki-hub' }));
       return;
@@ -136,39 +150,50 @@ export class MeshHub {
     const orchOk = this.orchWs != null && this.orchWs.readyState === WebSocket.OPEN;
     const meetsMinWorkers = readyMin == null || workerCount >= readyMin;
 
-    if (req.method === 'GET' && path === '/ready') {
+    if (req.method === 'GET' && urlPath === '/ready') {
       const ready = meetsMinWorkers;
       res.writeHead(ready ? 200 : 503, { 'Content-Type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          ready,
-          workers: workerCount,
-          orchestrator_connected: orchOk,
-          ready_min_workers: readyMin ?? null,
-        }),
-      );
+      res.end(JSON.stringify({ ready, workers: workerCount, orchestrator_connected: orchOk, ready_min_workers: readyMin ?? null }));
       return;
     }
 
-    if (req.method === 'GET' && path === '/metrics') {
-      res.writeHead(200, {
-        'Content-Type': 'text/plain; version=0.0.4; charset=utf-8',
-      });
+    if (req.method === 'GET' && urlPath === '/metrics') {
+      res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' });
       res.end(this.prometheusText());
       return;
     }
 
-    if (req.method === 'GET' && path === '/status') {
+    if (req.method === 'GET' && urlPath === '/status') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          workers: workerCount,
-          orchestrator_connected: orchOk,
-          ready_min_workers: readyMin ?? null,
-          instance: process.env.SHINGEKI_HUB_INSTANCE_ID?.trim() ?? os.hostname(),
-          ts: Date.now(),
-        }),
-      );
+      res.end(JSON.stringify({
+        workers: workerCount,
+        orchestrator_connected: orchOk,
+        ready_min_workers: readyMin ?? null,
+        instance: process.env.SHINGEKI_HUB_INSTANCE_ID?.trim() ?? os.hostname(),
+        ts: Date.now(),
+      }));
+      return;
+    }
+
+    if (req.method === 'GET' && urlPath === '/lineage') {
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-cache',
+      });
+      res.end(JSON.stringify(getLineage()));
+      return;
+    }
+
+    if (req.method === 'GET' && urlPath === '/viewer') {
+      try {
+        const html = fs.readFileSync(VIEWER_PATH, 'utf8');
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(html);
+      } catch {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('viewer/index.html not found');
+      }
       return;
     }
 
@@ -185,24 +210,14 @@ export class MeshHub {
       ? https.createServer(tlsopt, (req, res) => this.handleHttp(req, res))
       : http.createServer((req, res) => this.handleHttp(req, res));
 
-    const wss = new WebSocketServer({
-      noServer: true,
-      maxPayload,
-      perMessageDeflate: false,
-    });
-
+    const wss = new WebSocketServer({ noServer: true, maxPayload, perMessageDeflate: false });
     this.wss = wss;
     this.httpServer = server;
 
     server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
-      const path = req.url?.split('?')[0] ?? '/';
-      if (path !== '/') {
-        socket.destroy();
-        return;
-      }
-      wss.handleUpgrade(req, socket, head, ws => {
-        wss.emit('connection', ws, req);
-      });
+      const urlPath = req.url?.split('?')[0] ?? '/';
+      if (urlPath !== '/') { socket.destroy(); return; }
+      wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
     });
 
     wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
@@ -217,38 +232,27 @@ export class MeshHub {
         }
 
         const raw = buf.toString();
-        if (raw.length > maxPayload) {
-          ws.close(4004, 'payload too large');
-          return;
-        }
+        if (raw.length > maxPayload) { ws.close(4004, 'payload too large'); return; }
 
         const msg = parseMessage(raw);
         if (!msg) return;
         this.bumpWsMetric(msg.type);
 
         if (msg.type === 'ORCH_JOIN') {
-          if (!this.authOk(msg.payload)) {
-            ws.close(4001, 'unauthorized');
-            return;
-          }
+          if (!this.authOk(msg.payload)) { ws.close(4001, 'unauthorized'); return; }
           this.orchWs = ws;
-          ws.send(
-            encodeMessage('ORCH_WORKERS', { workerIds: [...this.workers.keys()] }),
-          );
+          ws.send(encodeMessage('ORCH_WORKERS', this.orchWorkersPayload()));
           log.info('orchestrator joined');
           return;
         }
 
         if (msg.type === 'NODE_JOIN') {
-          if (!this.authOk(msg.payload)) {
-            ws.close(4001, 'unauthorized');
-            return;
-          }
-          const p = msg.payload as { nodeId: string; capabilities?: string[] };
-          this.workers.set(p.nodeId, ws);
+          if (!this.authOk(msg.payload)) { ws.close(4001, 'unauthorized'); return; }
+          const p = msg.payload as { nodeId: string; capabilities?: string[]; nodeCapabilities?: NodeCapabilities };
+          this.workers.set(p.nodeId, { ws, capabilities: p.nodeCapabilities });
           ws.send(encodeMessage('NODE_JOIN', { ok: true, nodeId: p.nodeId }));
           this.notifyOrchestratorWorkers();
-          log.info('worker registered', { nodeId: p.nodeId });
+          log.info('worker registered', { nodeId: p.nodeId, role: p.nodeCapabilities?.role });
           return;
         }
 
@@ -258,33 +262,28 @@ export class MeshHub {
           return;
         }
 
+        if (msg.type === 'GENOME_LINEAGE') {
+          addLineageEntry(msg.payload as LineageEntry);
+          log.info('lineage entry stored', { genome_id: (msg.payload as LineageEntry).genome_id });
+          return;
+        }
+
         if (msg.type === 'TASK_ASSIGN') {
           if (ws !== this.orchWs) return;
-          const p = msg.payload as {
-            targetNodeId: string;
-            envelope: Record<string, unknown>;
-          };
-          const target = this.workers.get(p.targetNodeId);
-          if (!target || target.readyState !== WebSocket.OPEN) {
-            this.orchWs?.send(
-              encodeMessage('NODE_FAIL', {
-                targetNodeId: p.targetNodeId,
-                reason: 'worker not connected',
-              }),
-            );
+          const p = msg.payload as { targetNodeId: string; envelope: Record<string, unknown> };
+          const entry = this.workers.get(p.targetNodeId);
+          if (!entry || entry.ws.readyState !== WebSocket.OPEN) {
+            this.orchWs?.send(encodeMessage('NODE_FAIL', { targetNodeId: p.targetNodeId, reason: 'worker not connected' }));
             return;
           }
-          target.send(encodeMessage('TASK_ASSIGN', p.envelope));
+          entry.ws.send(encodeMessage('TASK_ASSIGN', p.envelope));
           return;
         }
 
         if (msg.type === 'STEP_RESULT') {
           let workerId: string | null = null;
-          for (const [id, w] of this.workers) {
-            if (w === ws) {
-              workerId = id;
-              break;
-            }
+          for (const [id, e] of this.workers) {
+            if (e.ws === ws) { workerId = id; break; }
           }
           if (!workerId) return;
           const payload = { ...(msg.payload as object), nodeId: workerId };
@@ -296,12 +295,9 @@ export class MeshHub {
       });
 
       ws.on('close', () => {
-        if (ws === this.orchWs) {
-          this.orchWs = null;
-          log.info('orchestrator disconnected');
-        }
-        for (const [k, w] of this.workers) {
-          if (w === ws) this.workers.delete(k);
+        if (ws === this.orchWs) { this.orchWs = null; log.info('orchestrator disconnected'); }
+        for (const [k, e] of this.workers) {
+          if (e.ws === ws) this.workers.delete(k);
         }
         this.notifyOrchestratorWorkers();
       });
@@ -314,36 +310,21 @@ export class MeshHub {
     log.info('listening', { port: this.opt.port, host, tls: Boolean(tlsopt) });
 
     const close = async () => {
-      try {
-        this.orchWs?.terminate();
-      } catch {
-        /* ignore */
-      }
+      try { this.orchWs?.terminate(); } catch { /* ignore */ }
       this.orchWs = null;
-      for (const w of this.workers.values()) {
-        try {
-          w.terminate();
-        } catch {
-          /* ignore */
-        }
+      for (const e of this.workers.values()) {
+        try { e.ws.terminate(); } catch { /* ignore */ }
       }
       this.workers.clear();
-
       await new Promise<void>(resolve => {
-        if (!this.wss) {
-          resolve();
-          return;
-        }
+        if (!this.wss) { resolve(); return; }
         this.wss.close(err => {
           if (err) log.warn('wss close', { err: (err as Error).message });
           resolve();
         });
       });
       await new Promise<void>(resolve => {
-        if (!this.httpServer) {
-          resolve();
-          return;
-        }
+        if (!this.httpServer) { resolve(); return; }
         this.httpServer.close(() => resolve());
       });
       this.wss = null;
@@ -355,8 +336,8 @@ export class MeshHub {
 
   broadcast(type: MeshMessage['type'], payload: unknown) {
     const raw = encodeMessage(type, payload);
-    for (const w of this.workers.values()) {
-      if (w.readyState === WebSocket.OPEN) w.send(raw);
+    for (const e of this.workers.values()) {
+      if (e.ws.readyState === WebSocket.OPEN) e.ws.send(raw);
     }
   }
 }

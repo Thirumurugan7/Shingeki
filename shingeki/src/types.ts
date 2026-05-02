@@ -8,11 +8,30 @@ export type CoordinationEventType =
   | 'STEP_RESULT'
   | 'NODE_FAIL'
   | 'RETRY'
-  | 'HEARTBEAT';
+  | 'HEARTBEAT'
+  | 'GENOME_LINEAGE';
 
 export interface MeshMessage<T = unknown> {
   type: CoordinationEventType;
   payload: T;
+}
+
+export interface EvaluationResult {
+  score: number;
+  reason?: string;
+  tee_verified?: boolean;
+  path: 'heuristic' | 'llm';
+}
+
+export interface LineageEntry {
+  genome_id: string;
+  parent_id?: string;
+  model: string;
+  strategy: string;
+  fitness_score: number;
+  tee_verified: boolean;
+  timestamp: number;
+  step_count: number;
 }
 
 export interface NodeCapability {
@@ -20,15 +39,17 @@ export interface NodeCapability {
   capabilities: string[];
   latencyMs?: number;
   stake?: number;
+  role?: string;
+  specialization?: string[];
 }
 
 export interface Step {
   id: string;
   description: string;
   dependsOn?: string[];
-  /** UI / logs — executor vs critic */
   title?: string;
   role?: string;
+  domain?: 'research' | 'coding' | 'planning' | 'general';
 }
 
 export interface Plan {
@@ -42,6 +63,8 @@ export interface StepResult {
   output: string;
   latencyMs: number;
   teeTrace?: Record<string, unknown>;
+  /** Populated by MeshOrchestrator after evaluateOutput() runs on each step. */
+  evalResult?: EvaluationResult;
 }
 
 export interface ExecutionTraceEntry {

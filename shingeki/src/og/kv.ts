@@ -37,7 +37,6 @@ export class ShingekiKv {
 
   /** CAS-style write: use version strictly greater than any prior (e.g. Date.now()). */
   async setJson(key: string, value: unknown, version: number): Promise<{ txHash: string }> {
-    const { ethers } = await import('ethers');
     const indexer = new Indexer(this.env.indexerRpc);
     const flowContract = getFlowContract(this.env.flowContract, this.signer as never);
     const [nodes, err] = await indexer.selectNodes(1);

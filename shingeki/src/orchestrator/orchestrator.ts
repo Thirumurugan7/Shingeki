@@ -26,6 +26,14 @@ export interface ExecutePlanOptions {
   afterEachStep?: (args: { stepIndex: number; result: StepResult }) => Promise<void>;
   /** Print [Mesh] ASCII bar when routing changes. Default true. */
   meshViz?: boolean;
+  /**
+   * Resume after crash: skip completed steps. `priorResults.length` must equal `nextStepIndex`.
+   * Orchestrator continues from step index `nextStepIndex`.
+   */
+  resume?: {
+    nextStepIndex: number;
+    priorResults: StepResult[];
+  };
 }
 
 /** Mesh orchestrator — parallel competition on step 1, chaining, retries, evolution hooks. */
@@ -72,16 +80,35 @@ export class MeshOrchestrator {
     const parallelFirst = options?.parallelFirstStep !== false;
     const parallelW = Math.min(options?.parallelWidth ?? 2, this.nodes.length);
 
+    const resume = options?.resume;
+    const nextIdx = resume?.nextStepIndex ?? 0;
+    const priorResults = resume?.priorResults ?? [];
+    if (resume && priorResults.length !== nextIdx) {
+      throw new Error(
+        `resume mismatch: nextStepIndex=${nextIdx} but priorResults.length=${priorResults.length}`,
+      );
+    }
+    if (nextIdx > plan.steps.length) {
+      throw new Error(`resume nextStepIndex ${nextIdx} exceeds plan (${plan.steps.length} steps)`);
+    }
+
     log('[Orchestrator] Plan:');
     plan.steps.forEach((s, i) => {
       const role = (s as Step & { role?: string }).role ?? 'worker';
       log(`  ${i + 1}. ${s.title ?? s.id} (${role})`);
     });
+    if (nextIdx > 0) {
+      log(`[Orchestrator] resuming from step ${nextIdx + 1} (${priorResults.length} completed)`);
+    }
 
-    const results: StepResult[] = [];
+    const results: StepResult[] = [...priorResults];
     let priorContext = '';
+    for (let i = 0; i < priorResults.length && i < plan.steps.length; i++) {
+      const sid = plan.steps[i]!.id;
+      priorContext += `\n\n### ${sid}\n${priorResults[i]!.output}`;
+    }
 
-    for (let si = 0; si < plan.steps.length; si++) {
+    for (let si = nextIdx; si < plan.steps.length; si++) {
       const step = plan.steps[si]!;
       const label = step.title ?? step.id;
 

@@ -28,6 +28,17 @@ import {
 } from './planner/research-plan.js';
 import { appendTraceWithRetry } from './og/log.js';
 import { checkDemoEnv, printEnvReport } from './config/env-check.js';
+import {
+  assertHubProductionSafe,
+  assertMeshClientProductionSafe,
+  hubPort,
+} from './config/runtime-config.js';
+import {
+  defaultCheckpointDir,
+  readCheckpoint,
+  writeCheckpointAtomic,
+  type DemoCheckpoint,
+} from './infra/checkpoint.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '../..');
@@ -40,9 +51,17 @@ function loadAgentMesh(configPath: string): AgentMeshConfig {
   return parseYaml(raw) as AgentMeshConfig;
 }
 
-function parseDemoArgs(argv: string[]): { mesh: boolean; preset: 'gpu' | 'japan'; rest: string[] } {
+function parseDemoArgs(argv: string[]): {
+  mesh: boolean;
+  preset: 'gpu' | 'japan';
+  resumeTaskId?: string;
+  taskIdArg?: string;
+  rest: string[];
+} {
   let mesh = false;
   let preset: 'gpu' | 'japan' = 'gpu';
+  let resumeTaskId: string | undefined;
+  let taskIdArg: string | undefined;
   const out: string[] = [];
   let i = 0;
   while (i < argv.length) {
@@ -52,11 +71,17 @@ function parseDemoArgs(argv: string[]): { mesh: boolean; preset: 'gpu' | 'japan'
       const p = argv[i + 1]!.toLowerCase();
       if (p === 'gpu' || p === 'japan') preset = p as 'gpu' | 'japan';
       i += 1;
+    } else if (a === '--resume' && argv[i + 1]) {
+      resumeTaskId = argv[i + 1]!;
+      i += 1;
+    } else if (a === '--task-id' && argv[i + 1]) {
+      taskIdArg = argv[i + 1]!;
+      i += 1;
     } else if (a.startsWith('-')) out.push(a);
     else out.push(a);
     i += 1;
   }
-  return { mesh, preset, rest: out };
+  return { mesh, preset, resumeTaskId, taskIdArg, rest: out };
 }
 
 function buildPlan(taskId: string, preset: 'gpu' | 'japan'): Plan {
@@ -114,7 +139,7 @@ async function verifyStepOnChain(
 
 async function cmdDemo() {
   const argv = process.argv.slice(3);
-  const { mesh, preset, rest } = parseDemoArgs(argv);
+  const { mesh, preset, resumeTaskId, taskIdArg, rest } = parseDemoArgs(argv);
   const taskOverride = rest.join(' ').trim();
 
   const envReport = checkDemoEnv();
@@ -124,21 +149,76 @@ async function cmdDemo() {
     process.exit(1);
   }
 
+  const checkpointDir = defaultCheckpointDir(shingekiRoot);
+  let cp: DemoCheckpoint | null = null;
+  if (resumeTaskId) {
+    cp = readCheckpoint(checkpointDir, resumeTaskId);
+    if (!cp) {
+      console.error(`No checkpoint for "${resumeTaskId}" under ${checkpointDir}`);
+      process.exit(1);
+    }
+    if (cp.preset !== preset) {
+      console.error(`Checkpoint preset ${cp.preset} does not match --preset ${preset}`);
+      process.exit(1);
+    }
+    if (cp.mesh !== mesh) {
+      console.error(`Checkpoint mesh=${cp.mesh} does not match current mesh flag (${mesh})`);
+      process.exit(1);
+    }
+    if (cp.results.length !== cp.nextStepIndex) {
+      console.error(
+        'Checkpoint corrupt: results.length must equal nextStepIndex (partial step recovery is not supported)',
+      );
+      process.exit(1);
+    }
+  }
+
   const cfgPath = path.join(shingekiRoot, 'agentmesh.example.yaml');
   const cfg = loadAgentMesh(cfgPath);
-  const genome = genomeFromConfig(cfg);
-  const genomeRef = { current: genome };
+  const baseGenome = genomeFromConfig(cfg);
+  const genomeRef = { current: cp?.genome ?? baseGenome };
 
-  const taskId = `task-${Date.now()}`;
+  const taskId = cp?.taskId ?? taskIdArg ?? `task-${Date.now()}`;
+  if (taskIdArg && cp && cp.taskId !== taskIdArg) {
+    console.error('--task-id must match checkpoint task id when using --resume');
+    process.exit(1);
+  }
+
   const plan = buildPlan(taskId, preset);
-  const summary = taskOverride || taskSummary(preset);
+  const summary = cp?.summary ?? (taskOverride || taskSummary(preset));
 
-  const evolveThreshold = Number(process.env.SHINGEKI_EVOLVE_THRESHOLD ?? '0.55');
+  const evolveThreshold =
+    cp?.evolveThreshold ?? Number(process.env.SHINGEKI_EVOLVE_THRESHOLD ?? '0.55');
+
+  const rollingResults: StepResult[] = cp ? [...cp.results] : [];
+
+  const persistCheckpoint = (stepIndex: number, result: StepResult) => {
+    rollingResults[stepIndex] = result;
+    const slice = rollingResults.slice(0, stepIndex + 1);
+    const payload: DemoCheckpoint = {
+      version: 1,
+      taskId,
+      preset,
+      mesh,
+      nextStepIndex: stepIndex + 1,
+      results: slice,
+      genome: genomeRef.current,
+      evolveThreshold,
+      summary,
+      updatedAt: Date.now(),
+    };
+    writeCheckpointAtomic(checkpointDir, payload);
+  };
 
   console.log('─── Shingeki demo ───');
   console.log('Goal:', summary.split('\n').map(l => l.trim()).join(' '));
   console.log('Preset:', preset, mesh ? '| mesh (hub + workers)' : '| local (in-process nodes)');
   console.log(`Evolution threshold (score < → mutate): ${evolveThreshold}`);
+  if (cp) {
+    console.log(`Resume: ${checkpointDir} | next step index ${cp.nextStepIndex} / ${plan.steps.length}`);
+  } else {
+    console.log(`Checkpoint dir: ${checkpointDir}`);
+  }
   console.log();
 
   const nodes: NodeCapability[] = [
@@ -153,6 +233,17 @@ async function cmdDemo() {
     ? new ethers.Wallet(pk, new ethers.JsonRpcProvider(loadKvEnv().rpcUrl))
     : null;
 
+  const resumeOpts =
+    cp && cp.nextStepIndex > 0 && cp.nextStepIndex <= plan.steps.length
+      ? { nextStepIndex: cp.nextStepIndex, priorResults: [...cp.results] }
+      : undefined;
+
+  if (cp && cp.nextStepIndex >= plan.steps.length) {
+    console.log('[Orchestrator] checkpoint complete — running finalize only.');
+    await finalize(cp.results, genomeRef.current, taskId);
+    return;
+  }
+
   const planOpts = {
     maxAttemptsPerStep: nodes.length,
     log,
@@ -163,18 +254,29 @@ async function cmdDemo() {
       ref: genomeRef,
       threshold: evolveThreshold,
     },
+    resume: resumeOpts,
     afterEachStep: async ({ stepIndex, result }: { stepIndex: number; result: StepResult }) => {
+      persistCheckpoint(stepIndex, result);
       await verifyStepOnChain(wallet, stepIndex + 1, result, summary);
     },
   };
 
   if (mesh) {
+    assertMeshClientProductionSafe();
     const hubUrl = hubUrlFromEnv();
     const minNodes = Math.max(2, cfg.mesh?.min_nodes ?? 2);
     log(`[Orchestrator] connecting hub ${hubUrl} (need ${minNodes} workers)`);
-    const ws = await openOrchestratorSession(hubUrl, minNodes, 120_000, log);
+    const { ws, workerIds } = await openOrchestratorSession(hubUrl, minNodes, 120_000, log);
 
-    const orch = new MeshOrchestrator(nodes);
+    // Build NodeCapability from actual registered worker IDs — not hardcoded names.
+    const roles = ['executor', 'critic'];
+    const meshNodes: NodeCapability[] = workerIds.map((id, i) => ({
+      id,
+      capabilities: ['llm', roles[i % roles.length]!],
+    }));
+    log(`[Orchestrator] routing over: ${meshNodes.map(n => n.id).join(', ')}`);
+
+    const orch = new MeshOrchestrator(meshNodes);
     const exec = createMeshStepExecutor(ws, () => genomeRef.current, { stepTimeoutMs: 240_000 });
 
     const wrapMesh: typeof exec = async args => {
@@ -241,21 +343,44 @@ async function finalize(results: StepResult[], genome: Genome, taskId: string) {
   console.log('\nDone.', taskId, '| active genome:', genome.id);
 }
 
-function cmdHub() {
-  const port = Number(process.env.SHINGEKI_HUB_PORT ?? 8765);
-  const authToken = process.env.SHINGEKI_HUB_TOKEN;
-  const hub = new MeshHub({ port, authToken });
-  hub.listen();
-  console.log(`Shingeki hub listening on ws://127.0.0.1:${port}`);
+async function cmdHub() {
+  assertHubProductionSafe();
+  const port = hubPort();
+  const rawTok = process.env.SHINGEKI_HUB_TOKEN?.trim();
+  const hub = new MeshHub({ port, authToken: rawTok || undefined });
+  let closer: (() => Promise<void>) | undefined;
+  let tls = false;
+  try {
+    const r = await hub.listen();
+    closer = r.close;
+    tls = r.tls;
+  } catch (e) {
+    console.error(e);
+    process.exit(1);
+  }
+  const h = tls ? 'https' : 'http';
+  const w = tls ? 'wss' : 'ws';
+  console.log(`Shingeki hub listening on ${w}://127.0.0.1:${port}`);
   console.log(
-    authToken
+    `${h}://127.0.0.1:${port}/health   ${h}://127.0.0.1:${port}/ready   Prometheus ${h}://127.0.0.1:${port}/metrics   JSON ${h}://127.0.0.1:${port}/status`,
+  );
+  console.log(
+    rawTok
       ? 'Hub auth: enabled — clients must set SHINGEKI_HUB_TOKEN (not logged)'
       : 'Hub auth: disabled — set SHINGEKI_HUB_TOKEN for shared-secret mode',
   );
   console.log('Start workers: NODE_ID=node-1 npm run node   (separate terminals)');
+
+  const shutdown = async () => {
+    if (closer) await closer();
+    process.exit(0);
+  };
+  process.once('SIGINT', () => void shutdown());
+  process.once('SIGTERM', () => void shutdown());
 }
 
 function cmdNode() {
+  assertMeshClientProductionSafe();
   const cfgPath = path.join(shingekiRoot, 'agentmesh.example.yaml');
   const cfg = loadAgentMesh(cfgPath);
   const genome = genomeFromConfig(cfg);
@@ -266,19 +391,27 @@ function cmdNode() {
     process.env.SHINGEKI_NODE_ID ??
     `node-${Math.random().toString(36).slice(2, 8)}`;
 
-  runWorkerHost(url, nodeId, genome, ['llm'], console.log);
+  const host = runWorkerHost(url, nodeId, genome, ['llm'], console.log);
   console.log(`Worker ${nodeId} → ${url}`);
+  const stop = () => {
+    host.close();
+    process.exit(0);
+  };
+  process.once('SIGINT', stop);
+  process.once('SIGTERM', stop);
 }
 
 async function main() {
   const cmd = process.argv[2] ?? 'demo';
   if (cmd === 'demo') await cmdDemo();
-  else if (cmd === 'hub') cmdHub();
+  else if (cmd === 'hub') await cmdHub();
   else if (cmd === 'node') cmdNode();
   else {
     console.log(`Usage: node --import tsx src/cli.ts <demo|hub|node> [demo flags]`);
     console.log(`  demo                    GPU research (parallel step 1 + evolution + 0G verification)`);
     console.log(`  demo --mesh             hub + workers (same)`);
+    console.log(`  demo --resume task-…    continue after crash (checkpoint in shingeki/.checkpoints)`);
+    console.log(`  demo --task-id ID       stable task id for checkpoints`);
     console.log(`  SHINGEKI_EVOLVE_THRESHOLD=0.55   score below → genome mutates`);
     process.exit(1);
   }

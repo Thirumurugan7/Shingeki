@@ -6,6 +6,7 @@ import { encodeMessage, parseMessage } from './protocol.js';
 import type { Genome } from '../genome/schema.js';
 import type { StepResult } from '../types.js';
 import type { StepExecutor } from '../orchestrator/orchestrator.js';
+import { orchConnectRetries } from '../config/runtime-config.js';
 
 export function hubUrlFromEnv(): string {
   const port = process.env.SHINGEKI_HUB_PORT ?? '8765';
@@ -18,22 +19,15 @@ export function orchJoinPayload(): Record<string, unknown> {
   return t ? { token: t } : {};
 }
 
-/**
- * Connect, attach ORCH_WORKERS listener, send ORCH_JOIN, wait until enough workers register.
- */
-export async function openOrchestratorSession(
-  hubUrl: string,
+const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+
+async function waitForWorkersRegistered(
+  ws: WebSocket,
   minWorkers: number,
   timeoutMs: number,
   log: (s: string) => void,
-): Promise<WebSocket> {
-  const ws = new WebSocket(hubUrl);
-  await new Promise<void>((res, rej) => {
-    ws.once('open', () => res());
-    ws.once('error', rej);
-  });
-
-  await new Promise<void>((resolve, reject) => {
+): Promise<string[]> {
+  return new Promise<string[]>((resolve, reject) => {
     let settled = false;
 
     const failTimer = setTimeout(() => {
@@ -53,7 +47,7 @@ export async function openOrchestratorSession(
           settled = true;
           clearTimeout(failTimer);
           ws.off('message', onMsg);
-          resolve();
+          resolve(ids);
         }
       }
     };
@@ -61,8 +55,50 @@ export async function openOrchestratorSession(
     ws.on('message', onMsg);
     ws.send(encodeMessage('ORCH_JOIN', orchJoinPayload()));
   });
+}
 
-  return ws;
+export interface OrchestratorSession {
+  ws: WebSocket;
+  /** Node IDs that were registered at the hub when the session was opened. */
+  workerIds: string[];
+}
+
+/**
+ * Connect (with TCP retries), attach ORCH_WORKERS listener, send ORCH_JOIN, wait until enough workers register.
+ * Returns both the WebSocket and the list of worker IDs so callers can build NodeCapability[] from real registrations.
+ */
+export async function openOrchestratorSession(
+  hubUrl: string,
+  minWorkers: number,
+  timeoutMs: number,
+  log: (s: string) => void,
+): Promise<OrchestratorSession> {
+  const attempts = orchConnectRetries();
+  let lastErr: Error | undefined;
+
+  for (let c = 0; c < attempts; c++) {
+    let ws: WebSocket | null = null;
+    try {
+      ws = new WebSocket(hubUrl);
+      await new Promise<void>((res, rej) => {
+        ws!.once('open', () => res());
+        ws!.once('error', rej);
+      });
+      const workerIds = await waitForWorkersRegistered(ws, minWorkers, timeoutMs, log);
+      return { ws, workerIds };
+    } catch (e: unknown) {
+      lastErr = e instanceof Error ? e : new Error(String(e));
+      log(`[Orchestrator] hub connect/session attempt ${c + 1}/${attempts} failed: ${lastErr.message}`);
+      try {
+        ws?.terminate();
+      } catch {
+        /* ignore */
+      }
+      if (c < attempts - 1) await sleep(400 * (c + 1));
+    }
+  }
+
+  throw lastErr ?? new Error('openOrchestratorSession failed');
 }
 
 type Pending = {

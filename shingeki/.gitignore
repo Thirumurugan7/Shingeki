@@ -1,4 +1,5 @@
 node_modules/
+.checkpoints/
 dist/
 .env
 .env.*

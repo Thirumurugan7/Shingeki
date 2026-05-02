@@ -1,0 +1,12 @@
+agent:
+  name: research-agent
+  strategy: plan-execute-reflect
+
+genome:
+  model: qwen/qwen-2.5-7b-instruct
+  tools: [web, code]
+  reflection_depth: 2
+  mutation_rate: 0.2
+
+mesh:
+  min_nodes: 2

@@ -1,0 +1,30 @@
+{
+  "name": "shingeki",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Shingeki — distributed cognitive mesh (orchestrator, node runtime, 0G verification, WS coordination)",
+  "scripts": {
+    "demo": "node --import tsx src/cli.ts demo",
+    "hub": "node --import tsx src/cli.ts hub",
+    "node": "node --import tsx src/cli.ts node",
+    "start": "node --import tsx src/cli.ts",
+    "test": "node --import tsx --test src/genome/evaluate.test.ts src/genome/mutation.test.ts"
+  },
+  "dependencies": {
+    "@0gfoundation/0g-ts-sdk": "^1.2.6",
+    "dotenv": "^16.3.1",
+    "ethers": "^6.13.1",
+    "ws": "^8.18.0",
+    "yaml": "^2.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,7 +1,7 @@
 import type { MeshMessage } from '../types.js';
 
 export interface NodeCapabilities {
-  role: 'memory' | 'reasoning' | 'executor' | 'general';
+  role: 'memory' | 'reasoning' | 'executor' | 'critic' | 'general';
   latency_ms: number;
   cost_weight: number;
   specialization: string[];

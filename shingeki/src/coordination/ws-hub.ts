@@ -32,9 +32,28 @@ import {
 const log = createLogger('mesh-hub');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const VIEWER_PATH = path.join(__dirname, '../viewer/index.html');
 const SHINGEKI_ROOT = path.resolve(__dirname, '..', '..');
-const CLI_TS = path.join(SHINGEKI_ROOT, 'src', 'cli.ts');
+
+/** Prefer shipped viewer/ (after build); fallback to src/viewer for dev without copy step. */
+function resolveViewerHtmlPath(root: string): string {
+  const shipped = path.join(root, 'viewer', 'index.html');
+  const dev = path.join(root, 'src', 'viewer', 'index.html');
+  if (fs.existsSync(shipped)) return shipped;
+  if (fs.existsSync(dev)) return dev;
+  return shipped;
+}
+
+const VIEWER_PATH = resolveViewerHtmlPath(SHINGEKI_ROOT);
+
+/** Production uses compiled CLI; dev falls back to tsx + src/cli.ts */
+function spawnCliRunArgv(runFlags: string[]): string[] {
+  const distCli = path.join(SHINGEKI_ROOT, 'dist', 'cli.js');
+  const srcCli = path.join(SHINGEKI_ROOT, 'src', 'cli.ts');
+  if (fs.existsSync(distCli)) {
+    return [distCli, 'run', ...runFlags];
+  }
+  return ['--import', 'tsx', srcCli, 'run', ...runFlags];
+}
 
 const RUN_API_MAX_BODY = 262_144;
 
@@ -82,7 +101,8 @@ function parseRunApiBody(body: unknown): ParseRunApi {
   const o = body as Record<string, unknown>;
 
   const presetIn = o.preset;
-  const preset = presetIn === 'japan' ? 'japan' : 'gpu';
+  const preset =
+    presetIn === 'japan' ? 'japan' : presetIn === 'defi' ? 'defi' : 'gpu';
 
   const mesh = o.mesh === true;
 
@@ -277,7 +297,7 @@ export class MeshHub {
       }
     }
 
-    const child = spawn(process.execPath, ['--import', 'tsx', CLI_TS, 'run', ...parsed.argv], {
+    const child = spawn(process.execPath, spawnCliRunArgv(parsed.argv), {
       cwd: SHINGEKI_ROOT,
       env: process.env,
       detached: true,
@@ -487,6 +507,7 @@ export class MeshHub {
         }
 
         if (msg.type === 'GENOME_LINEAGE') {
+          if (!this.authOk(msg.payload)) { ws.close(4001, 'unauthorized'); return; }
           addLineageEntry(msg.payload as LineageEntry);
           log.info('lineage entry stored', { genome_id: (msg.payload as LineageEntry).genome_id });
           return;
@@ -533,7 +554,16 @@ export class MeshHub {
     });
     log.info('listening', { port: this.opt.port, host, tls: Boolean(tlsopt) });
 
+    // Evict expired rate-limit buckets so the map doesn't grow unbounded under high IP churn.
+    const pruneHandle = setInterval(() => {
+      const now = Date.now();
+      for (const [ip, w] of this.rateWindow) {
+        if (now > w.resetAt) this.rateWindow.delete(ip);
+      }
+    }, 5 * 60_000);
+
     const close = async () => {
+      clearInterval(pruneHandle);
       try { this.orchWs?.terminate(); } catch { /* ignore */ }
       this.orchWs = null;
       for (const e of this.workers.values()) {

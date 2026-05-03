@@ -75,7 +75,7 @@ test('planToRequiredRoles total node count equals sum of all domain counts', () 
     ],
   };
   const roles = planToRequiredRoles(plan);
-  // Each domain has 1 step → 1 node, but total is 3 which is ≥ 2, no bump needed.
+  // 3 domains × 1 step each = 3 total ≥ 2, so the "ensure min 2 total" bump does not fire.
   assert.equal(roles['research'], 1);
   assert.equal(roles['coding'], 1);
   assert.equal(roles['planning'], 1);

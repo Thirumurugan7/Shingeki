@@ -10,7 +10,7 @@ export const CHECKPOINT_VERSION = 1 as const;
 export interface DemoCheckpoint {
   version: typeof CHECKPOINT_VERSION;
   taskId: string;
-  preset: 'gpu' | 'japan';
+  preset: 'gpu' | 'japan' | 'defi';
   mesh: boolean;
   /** Index of the next step to run (0-based); equals completed step count */
   nextStepIndex: number;

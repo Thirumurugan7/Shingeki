@@ -2,9 +2,75 @@
   "name": "shingeki",
   "version": "0.1.0",
   "type": "module",
-  "private": true,
-  "description": "Shingeki — distributed cognitive mesh (orchestrator, node runtime, 0G verification, WS coordination)",
+  "description": "Distributed cognitive mesh — multi-node LLM orchestration with genome evolution and on-chain verification via 0G",
+  "license": "MIT",
+  "author": "thirumurugan7",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thirumurugan7/shingeki.git"
+  },
+  "bugs": {
+    "url": "https://github.com/thirumurugan7/shingeki/issues"
+  },
+  "homepage": "https://github.com/thirumurugan7/shingeki#readme",
+  "keywords": [
+    "shingeki",
+    "ai-agent",
+    "multi-agent",
+    "orchestrator",
+    "mesh",
+    "llm",
+    "0g",
+    "router",
+    "tee",
+    "genome",
+    "evolution",
+    "websocket",
+    "uniswap",
+    "defi",
+    "on-chain",
+    "distributed"
+  ],
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./genome": {
+      "import": "./dist/genome/schema.js",
+      "types": "./dist/genome/schema.d.ts"
+    },
+    "./tools": {
+      "import": "./dist/tools/uniswap.js",
+      "types": "./dist/tools/uniswap.d.ts"
+    },
+    "./coordination": {
+      "import": "./dist/coordination/ws-hub.js",
+      "types": "./dist/coordination/ws-hub.d.ts"
+    },
+    "./types": {
+      "import": "./dist/types.js",
+      "types": "./dist/types.d.ts"
+    }
+  },
+  "bin": {
+    "shingeki": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "viewer",
+    "agentmesh.example.yaml",
+    "README.md",
+    "CHANGELOG.md",
+    "FEEDBACK.md",
+    "LICENSE"
+  ],
   "scripts": {
+    "build": "tsc && node scripts/copy-viewer.mjs",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build",
     "run": "node --import tsx src/cli.ts run",
     "demo": "node --import tsx src/cli.ts demo",
     "hub": "node --import tsx src/cli.ts hub",
@@ -12,7 +78,7 @@
     "node": "node --import tsx src/cli.ts node",
     "start": "node --import tsx src/cli.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/genome/evaluate.test.ts src/genome/mutation.test.ts src/coordination/protocol.test.ts src/coordination/hub.integration.test.ts src/orchestrator/resume.test.ts src/orchestrator/orchestrator.test.ts src/orchestrator/planner.test.ts src/infra/checkpoint.test.ts src/infra/lineage-store.test.ts",
+    "test": "node --import tsx --test src/genome/evaluate.test.ts src/genome/mutation.test.ts src/coordination/protocol.test.ts src/coordination/hub.integration.test.ts src/coordination/axl-transport.test.ts src/orchestrator/resume.test.ts src/orchestrator/orchestrator.test.ts src/orchestrator/planner.test.ts src/infra/checkpoint.test.ts src/infra/lineage-store.test.ts src/tools/uniswap.test.ts",
     "verify:viewer": "node scripts/verify-viewer.mjs",
     "e2e:viewer": "node scripts/e2e-viewer-task.mjs",
     "test:e2e": "playwright test -g smoke",

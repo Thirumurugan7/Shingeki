@@ -21,8 +21,10 @@ import { NodeRuntime } from './node-runtime/runtime.js';
 import {
   GPU_LLM_RESEARCH_GOAL,
   JAPAN_TRIP_GOAL,
+  DEFI_SWAP_GOAL,
   planJapanTrip,
   planResearchAnalyzeDecide,
+  defiPlan,
 } from './planner/research-plan.js';
 import { splitCompoundTask } from './orchestrator/planner.js';
 import { planToRequiredRoles } from './orchestrator/orchestrator.js';
@@ -32,7 +34,15 @@ import {
   assertHubProductionSafe,
   assertMeshClientProductionSafe,
   hubPort,
+  axlEnabled,
+  axlApiUrl,
+  axlHubPeerId,
+  axlWorkerPeerIds,
 } from './config/runtime-config.js';
+import { createAxlTransport } from './coordination/axl-transport.js';
+import { runAxlWorkerHost } from './coordination/axl-worker-host.js';
+import { runAxlOrchestratorSession, createAxlStepExecutor } from './coordination/axl-orchestrator.js';
+import { createLogger } from './infra/logger.js';
 import {
   defaultCheckpointDir,
   readCheckpoint,
@@ -44,10 +54,11 @@ import { routerInfer } from './og/compute-router.js';
 import type { NodeCapabilities } from './coordination/protocol.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, '../..');
 const shingekiRoot = path.resolve(__dirname, '..');
-config({ path: path.join(repoRoot, '.env') });
+// cwd (npm consumers) → package root → monorepo parent (dev convenience)
+config();
 config({ path: path.join(shingekiRoot, '.env') });
+config({ path: path.join(shingekiRoot, '..', '.env') });
 
 function loadAgentMesh(configPath: string): AgentMeshConfig {
   const raw = fs.readFileSync(configPath, 'utf8');
@@ -56,14 +67,14 @@ function loadAgentMesh(configPath: string): AgentMeshConfig {
 
 function parseRunArgs(argv: string[]): {
   mesh: boolean;
-  preset: 'gpu' | 'japan';
+  preset: 'gpu' | 'japan' | 'defi';
   resumeTaskId?: string;
   taskIdArg?: string;
   taskArg?: string;
   rest: string[];
 } {
   let mesh = false;
-  let preset: 'gpu' | 'japan' = 'gpu';
+  let preset: 'gpu' | 'japan' | 'defi' = 'gpu';
   let resumeTaskId: string | undefined;
   let taskIdArg: string | undefined;
   let taskArg: string | undefined;
@@ -74,7 +85,7 @@ function parseRunArgs(argv: string[]): {
     if (a === '--mesh' || a === '-m') mesh = true;
     else if (a === '--preset' && argv[i + 1]) {
       const p = argv[i + 1]!.toLowerCase();
-      if (p === 'gpu' || p === 'japan') preset = p as 'gpu' | 'japan';
+      if (p === 'gpu' || p === 'japan' || p === 'defi') preset = p as 'gpu' | 'japan' | 'defi';
       i += 1;
     } else if (a === '--resume' && argv[i + 1]) {
       resumeTaskId = argv[i + 1]!;
@@ -91,13 +102,16 @@ function parseRunArgs(argv: string[]): {
   return { mesh, preset, resumeTaskId, taskIdArg, taskArg, rest: out };
 }
 
-function buildPlan(taskId: string, preset: 'gpu' | 'japan'): Plan {
+function buildPlan(taskId: string, preset: 'gpu' | 'japan' | 'defi'): Plan {
   if (preset === 'japan') return planJapanTrip(taskId);
+  if (preset === 'defi') return defiPlan(taskId);
   return planResearchAnalyzeDecide(taskId);
 }
 
-function taskSummary(preset: 'gpu' | 'japan'): string {
-  return preset === 'japan' ? JAPAN_TRIP_GOAL : GPU_LLM_RESEARCH_GOAL;
+function taskSummary(preset: 'gpu' | 'japan' | 'defi'): string {
+  if (preset === 'japan') return JAPAN_TRIP_GOAL;
+  if (preset === 'defi') return DEFI_SWAP_GOAL;
+  return GPU_LLM_RESEARCH_GOAL;
 }
 
 async function verifyStepOnChain(
@@ -169,9 +183,17 @@ async function cmdRun() {
     if (cp.results.length !== cp.nextStepIndex) { console.error('Checkpoint corrupt: results.length must equal nextStepIndex'); process.exit(1); }
   }
 
-  const cfgPath = path.join(shingekiRoot, 'agentmesh.example.yaml');
+  if (preset === 'defi' && !process.env.UNISWAP_API_KEY?.trim()) {
+    console.warn('Warning: UNISWAP_API_KEY is not set — Uniswap quote call will fail on defi-quote step.');
+  }
+
+  const cfgPath = process.env.SHINGEKI_AGENTMESH_CONFIG?.trim() || path.join(shingekiRoot, 'agentmesh.example.yaml');
   const cfg = loadAgentMesh(cfgPath);
   const baseGenome = genomeFromConfig(cfg);
+  // Defi preset needs the uniswap tool active so runtime can execute embedded tool calls.
+  if (preset === 'defi' && !baseGenome.tools.includes('uniswap')) {
+    baseGenome.tools = [...baseGenome.tools, 'uniswap'];
+  }
   const genomeRef = { current: cp?.genome ?? baseGenome };
 
   const taskId = cp?.taskId ?? taskIdArg ?? `task-${Date.now()}`;
@@ -279,6 +301,44 @@ async function cmdRun() {
 
   if (mesh) {
     assertMeshClientProductionSafe();
+
+    if (axlEnabled()) {
+      const workerPeerIds = axlWorkerPeerIds();
+      log(`[Orchestrator] AXL P2P mode — ${workerPeerIds.length} configured worker peer(s)`);
+      const axlLog = createLogger('axl-orch');
+      const session = await runAxlOrchestratorSession({
+        workerPeerIds,
+        nodeId: 'orchestrator',
+        log: axlLog,
+        axlBaseUrl: axlApiUrl(),
+      });
+      const axlMeshNodes: NodeCapability[] = session.workerIds.map((id, i) => ({
+        id,
+        capabilities: ['llm', i % 2 === 0 ? 'executor' : 'critic'],
+        specialization: [],
+        latencyMs: 300,
+        stake: 10,
+      }));
+      log(`[Orchestrator] AXL routing over: ${axlMeshNodes.map(n => n.id).join(', ')}`);
+      const axlExec = createAxlStepExecutor(
+        session.transport,
+        session.workerPeerIdMap,
+        () => genomeRef.current,
+        240_000,
+      );
+      const wrapAxl: typeof axlExec = async args => {
+        log(`[${args.node.id}] AXL executing step: ${args.step.title ?? args.step.id}`);
+        const r = await axlExec(args);
+        log(`[${args.node.id}] AXL result received (latency: ${(r.latencyMs / 1000).toFixed(1)}s)`);
+        return r;
+      };
+      const orchAxl = new MeshOrchestrator(axlMeshNodes);
+      // AXL uses a shared recv queue — parallel sends would cause one leg to always time out.
+      const axlResults = await orchAxl.executePlan(plan, wrapAxl, { ...planOpts, parallelFirstStep: false });
+      await finalize(axlResults, genomeRef.current, taskId);
+      return;
+    }
+
     const hubUrl = hubUrlFromEnv();
     const minNodes = Math.max(2, cfg.mesh?.min_nodes ?? 2);
     log(`[Orchestrator] connecting hub ${hubUrl} (need ${minNodes} workers)`);
@@ -384,6 +444,15 @@ async function cmdHub() {
   );
   console.log('Start workers: NODE_ID=node-1 npm run node   (separate terminals)');
 
+  if (axlEnabled()) {
+    try {
+      const axlId = await createAxlTransport(axlApiUrl()).getIdentity();
+      console.log(`AXL mode: workers connect via P2P. Hub AXL peer ID: ${axlId.peerId}`);
+    } catch (e) {
+      console.warn('AXL mode: could not reach AXL sidecar:', (e as Error).message);
+    }
+  }
+
   // Auto-open viewer in interactive sessions.
   if (process.stdout.isTTY && !process.env.CI) {
     setTimeout(() => {
@@ -401,7 +470,7 @@ async function cmdHub() {
 
 async function cmdNode() {
   assertMeshClientProductionSafe();
-  const cfgPath = path.join(shingekiRoot, 'agentmesh.example.yaml');
+  const cfgPath = process.env.SHINGEKI_AGENTMESH_CONFIG?.trim() || path.join(shingekiRoot, 'agentmesh.example.yaml');
   const cfg = loadAgentMesh(cfgPath);
   const genome = genomeFromConfig(cfg);
 
@@ -435,6 +504,22 @@ async function cmdNode() {
     specialization,
   };
 
+  if (axlEnabled()) {
+    const hubPeerId = axlHubPeerId();
+    console.log(`Worker ${nodeId} → AXL peer ${hubPeerId}  role=${role} latency=${latencyMs}ms`);
+    const axlLog = createLogger('axl-worker');
+    // runAxlWorkerHost loops indefinitely; signal handlers not needed (process exits on throw).
+    await runAxlWorkerHost({
+      hubPeerId,
+      nodeId,
+      genome,
+      capabilities: nodeCapabilities,
+      log: axlLog,
+      axlBaseUrl: axlApiUrl(),
+    });
+    return;
+  }
+
   console.log(`Worker ${nodeId} → ${url}  role=${role} latency=${latencyMs}ms specialization=[${specialization.join(',')}]`);
   const host = runWorkerHost(url, nodeId, genome, ['llm'], nodeCapabilities, console.log);
   const stop = () => { host.close(); process.exit(0); };
@@ -451,12 +536,24 @@ async function main() {
     console.log(`Usage: node --import tsx src/cli.ts <run|hub|node> [flags]`);
     console.log(`  run                          orchestrate task (parallel step 1 + evolution + 0G verification)`);
     console.log(`  run --preset japan           structured Japan-trip preset`);
+    console.log(`  run --preset defi            DeFi: ETH market research + Uniswap quote + swap recommendation`);
     console.log(`  run --mesh                   distributed workers via hub (+ lineage viewer)`);
+    console.log(`  run --mesh (AXL_ENABLED=true)  distributed workers via Gensyn AXL P2P transport`);
     console.log(`  run --resume task-…          continue after crash (checkpoint)`);
     console.log(`  run --task "…"               free-form task (semicolon-separated steps; infers domains)`);
     console.log(`  demo                         alias for run (same behavior)`);
     console.log(`  hub                          start hub + open genome lineage viewer`);
     console.log(`  node                         start worker (NODE_ID, NODE_ROLE, NODE_SPECIALIZATION)`);
+    console.log(``);
+    console.log(`AXL P2P env vars (Gensyn transport, requires AXL sidecar — see axl/README.md):`);
+    console.log(`  AXL_ENABLED=true             enable AXL transport instead of WebSocket hub`);
+    console.log(`  AXL_API_URL=http://…:9002    AXL sidecar URL (default: http://127.0.0.1:9002)`);
+    console.log(`  AXL_HUB_PEER_ID=<peer-id>   hub's AXL peer ID (required for node command)`);
+    console.log(`  AXL_WORKER_PEER_IDS=id1,id2  worker peer IDs for orchestrator (run --mesh)`);
+    console.log(``);
+    console.log(`DeFi env vars:`);
+    console.log(`  UNISWAP_API_KEY=…            Uniswap Trade API key (required for --preset defi)`);
+    console.log(`  AGENT_WALLET=0x…             wallet address for swap quotes`);
     process.exit(1);
   }
 }

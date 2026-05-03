@@ -27,8 +27,8 @@ export function heuristicScore(output: string): number {
   const nums = (t.match(/\$?\d[\d,]*(?:\.\d+)?/g) ?? []).length;
   score += Math.min(0.15, nums * 0.02);
 
-  const gpuHints = /\b(VRAM|GB|RTX|RX|\d{3,4}\s*(Ti|SUPER)?|W\b|watt|TDP|CUDA|ROCm)\b/gi;
-  const m = t.match(gpuHints);
+  const domainHints = /\b(VRAM|GB|RTX|RX|TDP|CUDA|ROCm|watt|ETH|USDC|USD|swap|liquidity|gas|gwei|APY|route|flight|hotel|budget|itinerary|yen|schedule)\b|\$\d|\d+%/gi;
+  const m = t.match(domainHints);
   score += Math.min(0.2, (m?.length ?? 0) * 0.03);
 
   const tables = (t.match(/\|.*\|/g) ?? []).length;

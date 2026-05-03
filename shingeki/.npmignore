@@ -1,0 +1,18 @@
+# Source (compiled output in dist/ is included)
+src/
+
+# Tests and e2e
+e2e/
+test-results/
+playwright.config.ts
+
+# Dev scripts
+scripts/
+
+# Checkpoints generated at runtime
+.checkpoints/
+
+# Misc
+.DS_Store
+*.tgz
+axl/

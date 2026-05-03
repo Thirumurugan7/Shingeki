@@ -49,7 +49,7 @@ export interface Step {
   dependsOn?: string[];
   title?: string;
   role?: string;
-  domain?: 'research' | 'coding' | 'planning' | 'general';
+  domain?: 'research' | 'coding' | 'planning' | 'general' | 'defi';
 }
 
 export interface Plan {

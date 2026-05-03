@@ -110,11 +110,20 @@ type Pending = {
   timer: ReturnType<typeof setTimeout>;
 };
 
-const pending = new Map<string, Pending>();
+// Per-WebSocket pending maps — prevents cross-session step resolution when multiple
+// orchestrator sessions share the same Node.js process (e.g., in tests).
+const pendingByWs = new WeakMap<WebSocket, Map<string, Pending>>();
+
+function getOrCreatePending(ws: WebSocket): Map<string, Pending> {
+  let m = pendingByWs.get(ws);
+  if (!m) { m = new Map(); pendingByWs.set(ws, m); }
+  return m;
+}
 
 function attachListener(ws: WebSocket) {
   if ((ws as unknown as { _orch?: boolean })._orch) return;
   (ws as unknown as { _orch: boolean })._orch = true;
+  const pending = getOrCreatePending(ws);
 
   ws.on('message', (buf: WebSocket.RawData) => {
     const msg = parseMessage(buf.toString());
@@ -159,6 +168,7 @@ export function createMeshStepExecutor(
 ): StepExecutor {
   const timeoutMs = options?.stepTimeoutMs ?? 240_000;
   attachListener(ws);
+  const pending = getOrCreatePending(ws);
 
   return async ({ node, step }) => {
     /** Unique wire id so parallel legs (same logical step) don't collide in pending map */

@@ -152,3 +152,32 @@ export function orchConnectRetries(): number {
   }
   return Math.floor(n);
 }
+
+/** Returns UNISWAP_API_KEY or empty string — defi tool is optional, don't throw. */
+export function uniswapApiKey(): string {
+  return process.env.UNISWAP_API_KEY?.trim() ?? '';
+}
+
+// ── AXL / Gensyn P2P transport ────────────────────────────────────────────────
+
+export function axlEnabled(): boolean {
+  return process.env.AXL_ENABLED?.toLowerCase() === 'true';
+}
+
+export function axlApiUrl(): string {
+  return process.env.AXL_API_URL?.trim() || 'http://127.0.0.1:9002';
+}
+
+export function axlHubPeerId(): string {
+  const v = process.env.AXL_HUB_PEER_ID?.trim();
+  if (!v && axlEnabled()) {
+    throw new Error('AXL_HUB_PEER_ID is required when AXL_ENABLED=true');
+  }
+  return v ?? '';
+}
+
+export function axlWorkerPeerIds(): string[] {
+  const raw = process.env.AXL_WORKER_PEER_IDS?.trim();
+  if (!raw) return [];
+  return raw.split(',').map(s => s.trim()).filter(Boolean);
+}

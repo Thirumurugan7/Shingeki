@@ -1,11 +1,5 @@
 import type { Plan, Step } from '../types.js';
 
-let seq = 0;
-function nextId(prefix: string) {
-  seq += 1;
-  return `${prefix}-${seq}`;
-}
-
 const CODING_RE = /\b(code|implement|build|write|debug|fix|refactor|deploy|program|develop)\b/i;
 const RESEARCH_RE = /\b(search|find|gather|research|look up|fetch|investigate|survey|explore|discover)\b/i;
 const PLANNING_RE = /\b(plan|compare|decide|choose|recommend|select|evaluate|strategize|assess|analyse|analyze)\b/i;
@@ -35,7 +29,7 @@ export function planTask(taskId: string, taskText: string): Plan {
   if (!compound) {
     return {
       taskId,
-      steps: [{ id: nextId('step'), description: taskText.trim() }],
+      steps: [{ id: `${taskId}-step-1`, description: taskText.trim() }],
     };
   }
 
@@ -44,8 +38,8 @@ export function planTask(taskId: string, taskText: string): Plan {
     .map(s => s.trim())
     .filter(Boolean);
 
-  const steps: Step[] = parts.map(p => ({
-    id: nextId('step'),
+  const steps: Step[] = parts.map((p, i) => ({
+    id: `${taskId}-step-${i + 1}`,
     description: p,
   }));
 
@@ -64,7 +58,7 @@ export function splitCompoundTask(taskId: string, taskText: string): Plan {
       taskId,
       steps: [
         {
-          id: nextId('step'),
+          id: `${taskId}-step-1`,
           description: taskText.trim(),
           domain: inferDomain(userPart.trim()),
         },

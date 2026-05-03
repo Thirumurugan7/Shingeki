@@ -1,0 +1,1223 @@
+================================================================================
+SHINGEKI — FULL DOCUMENTATION
+================================================================================
+
+
+================================================================================
+PAGE 1 — INTRODUCTION
+================================================================================
+
+# What is Shingeki?
+
+Shingeki is a distributed cognitive mesh for multi-agent AI systems. Multiple nodes collaborate to
+solve multi-step tasks in parallel, each node running its own genome (model + strategy), competing
+on quality, and evolving automatically when output falls below threshold. Every decision is logged
+to 0G's tamper-proof storage so any participant can independently verify what ran, on what model,
+and with what result.
+
+
+## The problem it solves
+
+Most AI agent frameworks run one LLM call after another on a single node with a static prompt.
+When quality drops, there is no recovery — the system just produces a bad answer. There is no
+competition, no evolution, and no on-chain proof.
+
+Shingeki changes all three:
+
+| Problem                        | Shingeki's answer                                          |
+|--------------------------------|------------------------------------------------------------|
+| Single point of failure        | Multiple nodes compete — best output wins                  |
+| Static prompts                 | Genome evolves when fitness score drops below threshold    |
+| No verification                | Every step TEE-attested via 0G Router + logged to 0G Log Store |
+| Siloed agents                  | Distributed mesh — nodes run on separate machines          |
+
+
+## How it compares
+
+| Framework   | Architecture              | Evolution                      | Verified              |
+|-------------|---------------------------|--------------------------------|-----------------------|
+| LangChain   | Single chain, single node | Static prompts                 | No                    |
+| AutoGen     | Agent pairs, static roles | Static                         | No                    |
+| CrewAI      | Fixed crew, sequential    | Static                         | No                    |
+| Shingeki    | Distributed mesh          | Genome-driven (live TEE scoring) | TEE + 0G Log Store  |
+
+
+================================================================================
+PAGE 2 — CORE CONCEPTS
+================================================================================
+
+# Core Concepts
+
+
+## Genome
+
+Every agent node runs with a genome — a configuration object that defines its identity:
+
+{
+  id: 'genome-v1',
+  model: 'qwen/qwen-2.5-7b-instruct',
+  strategy: 'plan-execute-reflect',
+  tools: ['web', 'uniswap'],
+  reflection_depth: 2,
+  mutation_rate: 0.2,
+}
+
+The genome starts from your agentmesh.yaml file and mutates automatically when output quality
+drops below a configurable threshold. Every mutation is recorded to the lineage store and visible
+live in the browser viewer.
+
+
+## Plan
+
+A task is broken into a sequence of steps, each tagged with a domain:
+
+{
+  taskId: 'task-1234',
+  steps: [
+    { id: 'task-1234-step-1', description: 'Research GPU options',  domain: 'research'  },
+    { id: 'task-1234-step-2', description: 'Extract specs',         domain: 'research'  },
+    { id: 'task-1234-step-3', description: 'Compare options',       domain: 'planning'  },
+    { id: 'task-1234-step-4', description: 'Final recommendation',  domain: 'planning'  },
+  ]
+}
+
+Domain tags drive routing — research steps go to research specialist nodes, planning steps to
+planning specialist nodes, and so on.
+
+
+## Competition
+
+Step 1 of every plan runs on ALL available nodes in parallel. Each node produces a response,
+the fitness scorer evaluates all outputs, and the highest-scoring node's output chains into step 2.
+This is competition — quality selection before the work begins.
+
+
+## Round-robin routing (steps 2–N)
+
+After the competition step, subsequent steps route to domain-matched nodes in round-robin order
+with retry fallback. If a node fails, the orchestrator retries on the next available node.
+
+
+## Fitness scoring — two paths
+
+After every step, the output is evaluated by the fitness scorer:
+
+Path A — Heuristic (always runs, 0 tokens):
+  Structural signals: response length, bullet points, numbers, tables, domain keywords (GPU specs,
+  DeFi terms, travel vocabulary). Fast, synchronous, no API call.
+
+Path B — LLM judge (only when heuristic score < threshold, ~128 tokens):
+  A TEE-verified LLM call via 0G Router returns { score, reason }. The tee_verified flag is
+  stored on the step result.
+
+
+## Genome evolution
+
+If the score from either path is below the threshold (default 0.55), the genome mutates before the
+next step. Mutations cycle through three axes:
+
+  1. Prompt   — adjust the system instruction strategy
+  2. Model    — switch to the next fallback model
+  3. Strategy — change the reasoning strategy
+
+Every mutation is appended to the lineage store and visible in the browser viewer.
+
+
+## Verification
+
+Every step is:
+- TEE-attested    — the 0G Router runs with verify_tee: true, producing a cryptographic trace
+- Logged on-chain — the full input/output/TEE flag/rootHash is submitted to the 0G Log Store
+- Checkpointed    — atomic crash-recovery checkpoints let you resume any task after failure
+
+
+================================================================================
+PAGE 3 — GETTING STARTED
+================================================================================
+
+# Getting Started
+
+
+## Prerequisites
+
+- Node.js >= 22
+- A ROUTER_API_KEY from https://pc.0g.ai → Dashboard → API Keys
+
+
+## Install
+
+  npm install shingeki
+
+
+## Set your environment variables
+
+Create a .env file:
+
+  # Required
+  ROUTER_API_KEY=sk-your-key-here
+
+  # Optional — enables on-chain logging to 0G Log Store + KV
+  PRIVATE_KEY=0xYourWalletPrivateKey
+  BLOCKCHAIN_RPC=https://evmrpc-testnet.0g.ai
+  INDEXER_RPC=https://indexer-storage-testnet-turbo.0g.ai
+  FLOW_CONTRACT=0x22e03a6a89b950f1c82ec5e74f8eca321a105296
+  KV_NODE_URL=http://3.101.147.150:6789
+
+  # Optional — DeFi preset
+  UNISWAP_API_KEY=your-uniswap-api-key
+  AGENT_WALLET=0xYourWalletAddress
+
+Get testnet tokens from https://faucet.0g.ai if you want Log Store uploads to land on-chain.
+
+
+## Run the demo (no code needed)
+
+  # GPU research — find the best GPU under $1000 for local LLMs
+  npx shingeki demo
+
+  # 5-day Japan trip planner under $1500
+  npx shingeki demo --preset japan
+
+  # DeFi swap analysis + Uniswap quote (needs UNISWAP_API_KEY)
+  npx shingeki demo --preset defi
+
+  # Run your own task
+  npx shingeki run --task "Compare the top 3 L2s for a DeFi app launch"
+
+  # Resume after crash
+  npx shingeki demo --resume task-1234567890
+
+
+## What you'll see
+
+  ─── Shingeki run ───
+  Goal: Find the best GPU under $1000 for running local LLMs in 2026
+  Preset: gpu | local (in-process nodes)
+
+  Shingeki spawned 4 nodes: 2 research specialists, 2 planning specialists
+
+  [Orchestrator] Plan:
+    1. Search GPUs     (executor [research])
+    2. Extract specs   (executor [research])
+    3. Compare         (critic   [planning])
+    4. Recommend       (critic   [planning])
+
+  [Routing] Step 1 → PARALLEL node-1 + node-2
+  [node-1] calling 0G Compute (qwen/qwen-2.5-7b-instruct) — 3.3s
+  [node-2] calling 0G Compute (qwen/qwen-2.5-7b-instruct) — 3.3s
+  [Orchestrator] competition scores: node-1=0.85, node-2=0.85
+  [Orchestrator] winner → node-1
+
+  [Verification]
+    Step 1 logged to 0G
+    Trace ID   : 0xd7f342...
+    Router TEE : true
+    Eval score : 0.85 (heuristic)
+
+  ...
+
+  [0G KV] genome checkpoint written version 1777808537684
+
+  ─── Final synthesis ───
+  Recommendation: NVIDIA RTX 3060 — 12GB VRAM, 125W TDP, handles 7B and 13B models.
+
+
+================================================================================
+PAGE 4 — PROGRAMMATIC API
+================================================================================
+
+# Programmatic API
+
+
+## Minimal example — run a plan in-process
+
+  import 'dotenv/config';
+  import { MeshOrchestrator, NodeRuntime, planResearchAnalyzeDecide } from 'shingeki';
+
+  const genome = {
+    id: 'g1',
+    model: 'qwen/qwen-2.5-7b-instruct',
+    strategy: 'plan-execute-reflect',
+    tools: ['web'],
+    reflection_depth: 2,
+    mutation_rate: 0.2,
+  };
+
+  const taskId = `task-${Date.now()}`;
+  const plan = planResearchAnalyzeDecide(taskId);
+
+  const nodes = [
+    { id: 'node-1', capabilities: ['llm', 'research'], specialization: ['research'] },
+    { id: 'node-2', capabilities: ['llm', 'planning'], specialization: ['planning'] },
+  ];
+
+  const orch = new MeshOrchestrator(nodes);
+  let currentGenome = genome;
+
+  const results = await orch.executePlan(
+    plan,
+    async ({ node, step }) => {
+      const runtime = new NodeRuntime({ nodeId: node.id }, currentGenome);
+      return runtime.executeStep(step);
+    },
+    {
+      log: (msg) => console.log(msg),
+      onGenomeUpdate: (g) => { currentGenome = g; },
+    },
+  );
+
+  console.log(results.at(-1)?.output);
+
+
+## Load genome from YAML
+
+  import { genomeFromConfig } from 'shingeki';
+  import { parse } from 'yaml';
+  import { readFileSync } from 'node:fs';
+
+  const cfg = parse(readFileSync('agentmesh.example.yaml', 'utf8'));
+  const genome = genomeFromConfig(cfg, 'my-genome-v1');
+
+agentmesh.example.yaml:
+
+  agent:
+    name: research-agent
+    strategy: plan-execute-reflect
+
+  genome:
+    model: qwen/qwen-2.5-7b-instruct
+    tools: [web, code]
+    reflection_depth: 2
+    mutation_rate: 0.2
+
+  mesh:
+    min_nodes: 2
+
+
+## Split a free-form task into a plan
+
+  import { splitCompoundTask } from 'shingeki';
+
+  const plan = splitCompoundTask(
+    'task-001',
+    'Research Ethereum L2s; Compare fees and TPS; Recommend the best one for a DeFi launch',
+  );
+
+  // Each step gets a domain tag automatically:
+  // step 1 → domain: 'research'
+  // step 2 → domain: 'planning'
+  // step 3 → domain: 'planning'
+
+
+## Use a built-in preset plan
+
+  import {
+    planResearchAnalyzeDecide,  // 4-step research + recommendation pipeline
+    planJapanTrip,              // 6-step travel planner
+    defiPlan,                   // 4-step DeFi swap analysis
+  } from 'shingeki';
+
+  const plan = defiPlan(`task-${Date.now()}`);
+
+
+## Evaluate output and evolve the genome manually
+
+  import { evaluateOutput, applyMutation } from 'shingeki';
+
+  const result = await evaluateOutput(stepOutput, taskContext, 0.55);
+  // result.score        — 0.0 to 1.0
+  // result.path         — 'heuristic' | 'llm'
+  // result.tee_verified — true when LLM judge path ran
+
+  if (result.score < 0.55) {
+    const evolved = applyMutation(currentGenome);
+    // evolved.id       — new genome id
+    // evolved.model    — may have changed
+    // evolved.strategy — may have changed
+  }
+
+
+## Resume after crash
+
+  import {
+    readCheckpoint,
+    buildPriorContextFromResults,
+    listCheckpointSummaries,
+  } from 'shingeki';
+
+  // List all saved tasks
+  const saved = await listCheckpointSummaries('.checkpoints');
+  console.log(saved.map(s => `${s.taskId} — step ${s.nextStepIndex}/${s.totalSteps}`));
+
+  // Resume a specific task
+  const checkpoint = await readCheckpoint('.checkpoints', 'task-1234567890');
+  if (checkpoint) {
+    const priorContext = buildPriorContextFromResults(plan.steps, checkpoint.results);
+    // pass priorContext into executePlan to continue from where it stopped
+  }
+
+
+================================================================================
+PAGE 5 — GENOME & EVOLUTION
+================================================================================
+
+# Genome & Evolution
+
+
+## What is a genome?
+
+A genome is the configuration object that defines a node's identity and behaviour:
+
+| Field            | Type     | Description                                                              |
+|------------------|----------|--------------------------------------------------------------------------|
+| id               | string   | Unique genome identifier, increments on mutation (genome-v1, v2, ...)   |
+| model            | string   | LLM model name sent to 0G Router                                         |
+| strategy         | string   | Reasoning strategy (e.g. plan-execute-reflect, chain-of-thought)        |
+| tools            | string[] | Enabled tools (web, code, uniswap)                                      |
+| reflection_depth | number   | How many reflection passes the node runs                                 |
+| mutation_rate    | number   | Probability weight for mutation selection                                |
+
+
+## Fitness scorer — two paths
+
+Every step output is evaluated immediately after the node returns a result.
+
+Path A — Heuristic (synchronous, 0 tokens):
+
+  Scores structural signals of the output text:
+
+  | Signal                                              | Max contribution |
+  |-----------------------------------------------------|------------------|
+  | Response length >= 80 chars                         | Base 0.2         |
+  | Line count                                          | +0.02/line, max 0.25 |
+  | Bullet points                                       | +0.04/bullet, max 0.20 |
+  | Numbers / figures                                   | +0.02/number, max 0.15 |
+  | Domain keywords (GPU specs, DeFi terms, travel)     | +0.03/match, max 0.20 |
+  | Markdown tables                                     | +0.05/row, max 0.10 |
+
+Path B — LLM judge (async, ~128 tokens, TEE-verified):
+
+  Triggered only when the heuristic score is below the threshold (default 0.55). Sends the step
+  output to the 0G Router with verify_tee: true and receives { score, reason }. The tee_verified
+  flag is stored on the step result.
+
+
+## Mutation axes
+
+When a step scores below threshold, the genome mutates before the next step. Mutations cycle
+through three axes in order:
+
+  genome-v1 (score 0.42) →  mutate prompt   → genome-v2
+  genome-v2 (score 0.48) →  mutate model    → genome-v3
+  genome-v3 (score 0.51) →  mutate strategy → genome-v4
+  genome-v4 (score 0.71) →  promoted ✓
+
+  Prompt mutation   — adjusts the system instruction to be more structured or precise
+  Model mutation    — switches to the next fallback model from FALLBACK_MODELS list
+  Strategy mutation — changes the reasoning strategy string passed to the prompt builder
+
+
+## Lineage store
+
+Every mutation is appended to the in-process lineage store:
+
+  {
+    genome_id: 'genome-v3',
+    parent_id: 'genome-v2',
+    model: 'meta-llama/llama-3.1-8b-instruct',
+    strategy: 'chain-of-thought',
+    fitness_score: 0.51,
+    tee_verified: true,
+    timestamp: 1746000000000,
+    step_count: 3,
+  }
+
+Exposed at GET /lineage on the hub and rendered live in the browser viewer at
+http://localhost:8765/viewer.
+
+
+## Configuring the threshold
+
+  SHINGEKI_EVOLVE_THRESHOLD=0.60   # stricter — mutate more often
+  SHINGEKI_EVOLVE_THRESHOLD=0.40   # lenient  — only mutate on very poor output
+
+
+================================================================================
+PAGE 6 — 0G INTEGRATION
+================================================================================
+
+# 0G Integration
+
+Shingeki uses three 0G primitives: the Router for every LLM call, the Log Store for per-step
+execution traces, and the KV Store for genome checkpoints.
+
+
+## 0G Router
+
+Every LLM call goes through the 0G Router at router-api.0g.ai/v1. Two flags are always on:
+
+  verify_tee: true          — validates TEE attestation server-side; returns tee_verified boolean
+  provider: { sort: "latency" } — auto-selects the fastest available provider
+
+Under the hood — every NodeRuntime step call:
+
+  const result = await routerInfer(prompt, systemPrompt, {
+    model: genome.model,
+    max_tokens: 1024,
+    verify_tee: true,
+    provider: { sort: 'latency' },
+  });
+
+  result.text                 // LLM response text
+  result.trace.tee_verified   // true | false
+
+The fitness judge also uses the Router with max_tokens: 128 and temperature: 0:
+
+  const judgeResult = await routerInfer(userContent, JUDGE_SYSTEM, {
+    max_tokens: 128,
+    temperature: 0,
+    verify_tee: true,
+  });
+  // judgeResult.text → '{ "score": 0.82, "reason": "..." }'
+
+
+## 0G Log Store
+
+After every completed step, the full execution trace is uploaded to the 0G Log Store:
+
+  {
+    step: 1,
+    node: 'node-1',
+    input: '...prompt...',
+    output: '...response...',
+    tee_verified: true,
+    timestamp: 1746000000000,
+    rootHash: '0xd7f342...',
+  }
+
+The rootHash is content-addressed — anyone can verify the trace by hashing the payload and
+comparing to the on-chain rootHash.
+
+Terminal output:
+
+  [Verification]
+    Step 1 logged to 0G
+    Trace ID   : 0xd7f342ad0d27fe8aec7d7778251d763c7a40c18e8cd3e536d42efd5b60889444
+    Router TEE : true
+    Eval score : 0.85 (heuristic)
+
+
+## 0G KV Store
+
+After the task completes, the final genome state is written to the KV Store as a checkpoint:
+
+  [0G KV] genome checkpoint written version 1777808537684
+
+This checkpoint can be read back to restore the evolved genome for a follow-up task.
+
+
+## Setup for on-chain verification
+
+Add to your .env:
+
+  PRIVATE_KEY=0xYourWalletPrivateKey
+  BLOCKCHAIN_RPC=https://evmrpc-testnet.0g.ai
+  INDEXER_RPC=https://indexer-storage-testnet-turbo.0g.ai
+  FLOW_CONTRACT=0x22e03a6a89b950f1c82ec5e74f8eca321a105296
+  KV_NODE_URL=http://3.101.147.150:6789
+
+Get testnet OG tokens: https://faucet.0g.ai
+
+Without PRIVATE_KEY, all LLM calls still run through the 0G Router with full TEE verification.
+Only the Log Store and KV uploads are skipped.
+
+
+## 0G primitives summary
+
+| Primitive           | Endpoint                          | Used for                          | When                   |
+|---------------------|-----------------------------------|-----------------------------------|------------------------|
+| 0G Router           | router-api.0g.ai/v1               | Every LLM step + fitness judge    | Every plan step        |
+| TEE attestation     | via Router verify_tee: true       | Proof of execution                | Always on              |
+| 0G Log Store        | via @0gfoundation/0g-ts-sdk       | Per-step trace (append-only)      | After each step        |
+| 0G KV Store         | via @0gfoundation/0g-ts-sdk       | Final genome state                | After task completes   |
+
+
+================================================================================
+PAGE 7 — UNISWAP INTEGRATION
+================================================================================
+
+# Uniswap Integration
+
+Shingeki includes a first-class Uniswap Trade API integration. When 'uniswap' is in the genome's
+tool list, the NodeRuntime automatically detects embedded tool calls in LLM output and executes
+them — no manual wiring needed.
+
+
+## How it works
+
+The LLM is told about the uniswap_quote tool in its system prompt. When it decides a swap quote
+is relevant, it embeds a JSON block in its response:
+
+  {
+    "tool": "uniswap_quote",
+    "tokenIn": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "tokenOut": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "amount": "1000000000000000000",
+    "chainId": 1,
+    "swapper": "0xYourWalletAddress"
+  }
+
+The NodeRuntime scans the LLM output for this pattern after every step. If found, it calls the
+Uniswap Trade API and appends the result to the step output before returning it to the orchestrator.
+
+Quote summary appended automatically:
+
+  **Uniswap Quote:**
+  routing=V3 | tokenIn=1.0 WETH | tokenOut=3,241.50 USDC | gas=$2.14 | priceImpact=0.03%
+
+The full quote + swap tx data is included in the step result and logged to the 0G Log Store.
+
+
+## Enable the Uniswap tool
+
+  # .env
+  UNISWAP_API_KEY=your-api-key-from-developers.uniswap.org
+  AGENT_WALLET=0xYourWalletAddress
+
+  // In your genome config
+  const genome = {
+    id: 'g1',
+    model: 'qwen/qwen-2.5-7b-instruct',
+    strategy: 'plan-execute-reflect',
+    tools: ['web', 'uniswap'],   // ← add 'uniswap'
+    reflection_depth: 2,
+    mutation_rate: 0.2,
+  };
+
+Or use the built-in DeFi preset which wires everything automatically:
+
+  npx shingeki demo --preset defi
+
+
+## Direct API usage
+
+  import { getUniswapQuote, buildUniswapSwap, checkUniswapApproval } from 'shingeki';
+
+  // Step 1 — get a quote
+  const quote = await getUniswapQuote({
+    tokenIn:  '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // WETH
+    tokenOut: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', // USDC
+    amount:   '1000000000000000000',                        // 1 ETH in wei
+    chainId:  1,
+    swapper:  '0xYourWalletAddress',
+    slippageTolerance: 0.5,                                 // 0.5% default
+  });
+
+  console.log(quote.routing);          // 'V3' | 'V4' | 'DUTCH_V2' | ...
+  console.log(quote.tokenOut.amount);  // USDC out amount
+  console.log(quote.gasFeeUSD);        // estimated gas cost in USD
+  console.log(quote.priceImpact);      // price impact as decimal
+
+  // Step 2 — build the swap calldata (not submitted — returned to wallet to sign)
+  const tx = await buildUniswapSwap(quote);
+  console.log(tx.to);       // router contract address
+  console.log(tx.data);     // encoded calldata
+  console.log(tx.value);    // ETH value to send
+  console.log(tx.gasLimit); // estimated gas
+
+  // Step 3 — check if token approval is needed first
+  const approval = await checkUniswapApproval(
+    quote.tokenIn.token,
+    quote.tokenIn.amount,
+    '0xYourWalletAddress',
+    1,
+  );
+  if (approval) {
+    // submit approval.data first, then tx.data
+  }
+
+
+## Routing guard
+
+Dutch order routing (DUTCH_V2, DUTCH_V3, PRIORITY) is blocked in the current release — these
+require off-chain order signing which is outside the agent execution scope. Classic routing
+(V4, V3, V2) is fully supported.
+
+  // This throws with a clear message
+  await buildUniswapSwap(quoteWithDutchRouting);
+  // Error: Dutch order routing not supported in MVP — use CLASSIC routing
+
+
+## API key setup
+
+Get your key from https://developers.uniswap.org/dashboard
+Both UNISWAP_API_KEY and UNISWAP_APIKEY are accepted as env var names.
+
+
+================================================================================
+PAGE 8 — DISTRIBUTED MESH
+================================================================================
+
+# Distributed Mesh
+
+Run agent nodes across multiple machines. The orchestrator routes plan steps to whichever node
+has the right specialization, with automatic retry if a node fails.
+
+
+## Architecture
+
+  Hub (machine 1)
+    ├── WebSocket server for workers + orchestrators
+    ├── HTTP: /health /ready /metrics /status /lineage /viewer /api/run
+    └── Lineage viewer (browser UI)
+
+  Worker A (machine 2) — research specialist
+  Worker B (machine 3) — planning specialist
+
+  Orchestrator (machine 4) — dispatches plan steps
+
+
+## Step 1 — Start the hub
+
+  SHINGEKI_HUB_TOKEN=my-secret npx shingeki hub
+
+The hub starts on port 8765 by default. The genome lineage viewer opens automatically at
+http://localhost:8765/viewer.
+
+  # Custom port and bind address
+  SHINGEKI_HUB_PORT=9000 SHINGEKI_HUB_HOST=0.0.0.0 npx shingeki hub
+
+
+## Step 2 — Start worker nodes
+
+  # Worker A — research specialist
+  NODE_ID=node-1 \
+  NODE_ROLE=executor \
+  NODE_SPECIALIZATION=research \
+  SHINGEKI_HUB_URL=ws://hub-host:8765 \
+  SHINGEKI_HUB_TOKEN=my-secret \
+  npx shingeki node
+
+  # Worker B — planning specialist
+  NODE_ID=node-2 \
+  NODE_ROLE=reasoning \
+  NODE_SPECIALIZATION=planning \
+  SHINGEKI_HUB_URL=ws://hub-host:8765 \
+  SHINGEKI_HUB_TOKEN=my-secret \
+  npx shingeki node
+
+Workers reconnect automatically with exponential backoff if the hub restarts.
+
+
+## Step 3 — Run a task against the mesh
+
+  SHINGEKI_HUB_URL=ws://hub-host:8765 \
+  SHINGEKI_HUB_TOKEN=my-secret \
+  npx shingeki demo --mesh
+
+  # Or with a custom task
+  SHINGEKI_HUB_URL=ws://hub-host:8765 \
+  SHINGEKI_HUB_TOKEN=my-secret \
+  npx shingeki run --task "Analyze DeFi lending protocols on Arbitrum" --mesh
+
+
+## Programmatic distributed execution
+
+  import {
+    openOrchestratorSession,
+    createMeshStepExecutor,
+    hubUrlFromEnv,
+    MeshOrchestrator,
+    planResearchAnalyzeDecide,
+  } from 'shingeki';
+
+  const taskId = `task-${Date.now()}`;
+  const plan = planResearchAnalyzeDecide(taskId);
+
+  // Connect to hub as orchestrator
+  const ws = await openOrchestratorSession(
+    hubUrlFromEnv(),
+    process.env.SHINGEKI_HUB_TOKEN,
+  );
+
+  const executor = createMeshStepExecutor(ws);
+
+  const nodes = [/* received from hub ORCH_WORKERS message */];
+  const orch = new MeshOrchestrator(nodes);
+  const results = await orch.executePlan(plan, executor);
+
+  ws.close();
+  console.log(results.at(-1)?.output);
+
+
+## Submit via HTTP
+
+  curl -X POST http://hub-host:8765/api/run \
+    -H "Authorization: Bearer my-secret" \
+    -H "Content-Type: application/json" \
+    -d '{ "task": "Compare the top 3 Ethereum L2s", "mesh": true }'
+
+
+## Hub HTTP endpoints
+
+| Endpoint                  | Method | Description                                          |
+|---------------------------|--------|------------------------------------------------------|
+| /health                   | GET    | { "ok": true }                                       |
+| /ready                    | GET    | { "ready": true } when minimum workers connected     |
+| /metrics                  | GET    | Prometheus text format                               |
+| /status                   | GET    | JSON snapshot — worker list, lineage count           |
+| /lineage                  | GET    | Full genome lineage array                            |
+| /viewer                   | GET    | Self-contained browser lineage viewer                |
+| /checkpoints              | GET    | List task checkpoint summaries                       |
+| /checkpoint?id=task-…     | GET    | Single checkpoint JSON                               |
+| /api/run                  | POST   | Submit a task, returns step results                  |
+
+
+## Node roles
+
+| Role      | Description                                     |
+|-----------|-------------------------------------------------|
+| executor  | Runs research and data-gathering steps          |
+| critic    | Evaluates, compares, and recommends             |
+| reasoning | Planning and multi-step analysis                |
+| memory    | Context aggregation and summarisation           |
+| general   | Handles any step type                           |
+
+
+## Node specializations
+
+| Specialization | Best for                                              |
+|----------------|-------------------------------------------------------|
+| research       | Web search, data gathering, fact extraction           |
+| planning       | Comparison, strategy, recommendation                  |
+| coding         | Code generation, debugging, implementation            |
+| defi           | DeFi analysis, token routing, protocol evaluation     |
+
+
+## Production security
+
+  NODE_ENV=production
+  SHINGEKI_HUB_TOKEN=a-strong-random-secret
+  SHINGEKI_HUB_STRICT_HTTP_AUTH=1
+  SHINGEKI_HUB_TLS_CERT=/path/to/fullchain.pem
+  SHINGEKI_HUB_TLS_KEY=/path/to/privkey.pem
+
+
+================================================================================
+PAGE 9 — AXL P2P TRANSPORT
+================================================================================
+
+# AXL P2P Transport
+
+AXL replaces the WebSocket hub with broker-free peer-to-peer transport via the Gensyn AXL sidecar.
+No central hub process is needed — workers and orchestrators discover and communicate directly.
+
+
+## When to use AXL vs WebSocket hub
+
+|                    | WebSocket Hub                  | AXL P2P                             |
+|--------------------|--------------------------------|-------------------------------------|
+| Setup complexity   | Low — one hub process          | Medium — sidecar on each machine    |
+| Central broker     | Yes                            | No                                  |
+| Best for           | Local dev, single datacenter   | Multi-region, decentralised         |
+| Requires           | npm run hub                    | Gensyn AXL sidecar binary           |
+
+
+## Enable AXL
+
+Set AXL_ENABLED=true on every participant (hub, workers, orchestrator):
+
+  AXL_ENABLED=true                    # use AXL instead of WebSocket
+  AXL_API_URL=http://127.0.0.1:9002   # AXL sidecar URL (default)
+
+
+## Start the hub with AXL
+
+  AXL_ENABLED=true npx shingeki hub
+  # Prints: AXL peer ID: 12D3Koo...
+  # Share this peer ID with workers
+
+
+## Start workers with AXL
+
+  AXL_ENABLED=true \
+  AXL_HUB_PEER_ID=12D3Koo... \
+  NODE_ID=node-1 \
+  NODE_SPECIALIZATION=research \
+  npx shingeki node
+
+
+## Run a task with AXL
+
+  AXL_ENABLED=true \
+  AXL_WORKER_PEER_IDS=12D3KooWorker1,12D3KooWorker2 \
+  npx shingeki demo --mesh
+
+
+## Programmatic AXL usage
+
+  import {
+    createAxlTransport,
+    runAxlWorkerHost,
+    runAxlOrchestratorSession,
+    createAxlStepExecutor,
+  } from 'shingeki';
+
+  // Create a transport
+  const axl = createAxlTransport('http://127.0.0.1:9002');
+
+  // Get this node's peer identity
+  const identity = await axl.getIdentity();
+  console.log(identity.peerId);
+
+  // Send a message to a peer
+  await axl.send(targetPeerId, messageBytes);
+
+  // Receive next message (with timeout)
+  const msg = await axl.recvWait(5000);
+
+  // Start a worker
+  await runAxlWorkerHost({
+    axl,
+    hubPeerId: 'hub-peer-id',
+    nodeId: 'node-1',
+    specialization: ['research'],
+    genome,
+  });
+
+  // Start an orchestrator session
+  const session = await runAxlOrchestratorSession({
+    axl,
+    workerPeerIds: ['worker-1-peer-id', 'worker-2-peer-id'],
+  });
+  const executor = createAxlStepExecutor(session);
+
+
+## AXL message protocol
+
+| Message      | Direction              | Payload                                     |
+|--------------|------------------------|---------------------------------------------|
+| NODE_JOIN    | Worker → Hub/Orch      | { nodeId, role, specialization }            |
+| ORCH_JOIN    | Orchestrator → Workers | { orchestratorPeerId }                      |
+| ORCH_WORKERS | Hub → Orchestrator     | { workers: NodeCapabilities[] }             |
+| TASK_ASSIGN  | Orchestrator → Worker  | { step, priorContext }                      |
+| STEP_RESULT  | Worker → Orchestrator  | { stepId, output, latencyMs, teeTrace }     |
+| HEARTBEAT    | Worker → Hub           | {}                                          |
+| HEARTBEAT_ACK| Hub → Worker           | {}                                          |
+
+
+================================================================================
+PAGE 10 — LINEAGE VIEWER
+================================================================================
+
+# Lineage Viewer
+
+The lineage viewer is a self-contained browser UI that renders the genome mutation tree in real
+time. It opens automatically when the hub starts.
+
+
+## Access
+
+  http://localhost:8765/viewer
+
+
+## What it shows
+
+- Genome tree      — parent → child arrows showing which genome mutated into which
+- Fitness bars     — score for each genome version at the step it was promoted or rejected
+- TEE badges       — which evaluations were verified by the LLM judge with TEE attestation
+- Model + strategy — the active model and reasoning strategy at each node in the tree
+- Live updates     — polls /lineage every 3 seconds; no page refresh needed
+
+
+## Lineage API
+
+  curl http://localhost:8765/lineage
+
+  [
+    {
+      "genome_id": "genome-v1",
+      "parent_id": null,
+      "model": "qwen/qwen-2.5-7b-instruct",
+      "strategy": "plan-execute-reflect",
+      "fitness_score": 0.85,
+      "tee_verified": false,
+      "timestamp": 1746000000000,
+      "step_count": 1
+    },
+    {
+      "genome_id": "genome-v2",
+      "parent_id": "genome-v1",
+      "model": "meta-llama/llama-3.1-8b-instruct",
+      "strategy": "plan-execute-reflect",
+      "fitness_score": 0.42,
+      "tee_verified": true,
+      "timestamp": 1746000010000,
+      "step_count": 2
+    }
+  ]
+
+
+## Programmatic lineage access
+
+  import { MeshHub } from 'shingeki';
+
+  const hub = new MeshHub({ port: 8765 });
+  await hub.listen();
+
+  const lineage = hub.getLineage();
+  lineage.forEach(entry => {
+    console.log(`${entry.genome_id} → score ${entry.fitness_score} (tee: ${entry.tee_verified})`);
+  });
+
+
+================================================================================
+PAGE 11 — ENVIRONMENT VARIABLES
+================================================================================
+
+# Environment Variables
+
+
+## Required
+
+| Variable        | Description                                                   |
+|-----------------|---------------------------------------------------------------|
+| ROUTER_API_KEY  | Required. From https://pc.0g.ai → Dashboard → API Keys       |
+
+
+## 0G on-chain verification (optional)
+
+| Variable        | Description                                                              |
+|-----------------|--------------------------------------------------------------------------|
+| PRIVATE_KEY     | Wallet private key — enables 0G Log Store + KV uploads                   |
+| BLOCKCHAIN_RPC  | EVM RPC URL. Testnet: https://evmrpc-testnet.0g.ai                       |
+| INDEXER_RPC     | 0G indexer URL. Testnet: https://indexer-storage-testnet-turbo.0g.ai     |
+| FLOW_CONTRACT   | 0G Flow contract. Testnet: 0x22e03a6a89b950f1c82ec5e74f8eca321a105296   |
+| KV_NODE_URL     | 0G KV node. Testnet: http://3.101.147.150:6789                           |
+| ROUTER_BASE_URL | Override Router URL. Testnet: https://router-api-testnet.integratenetwork.work/v1 |
+
+
+## Genome / evolution
+
+| Variable                    | Default               | Description                                  |
+|-----------------------------|-----------------------|----------------------------------------------|
+| SHINGEKI_EVOLVE_THRESHOLD   | 0.55                  | Fitness below this triggers genome mutation  |
+| SHINGEKI_AGENTMESH_CONFIG   | agentmesh.example.yaml| Path to custom genome YAML config            |
+
+
+## Hub
+
+| Variable                       | Default              | Description                                            |
+|--------------------------------|----------------------|--------------------------------------------------------|
+| SHINGEKI_HUB_PORT              | 8765                 | Hub WebSocket + HTTP port                              |
+| SHINGEKI_HUB_HOST              | 0.0.0.0              | Hub bind address                                       |
+| SHINGEKI_HUB_TOKEN             | —                    | Shared secret — required in production                 |
+| SHINGEKI_HUB_STRICT_HTTP_AUTH  | —                    | 1 → enforce Bearer on all requests incl. loopback     |
+| SHINGEKI_HUB_TLS_CERT          | —                    | Path to TLS certificate (fullchain.pem)                |
+| SHINGEKI_HUB_TLS_KEY           | —                    | Path to TLS key (privkey.pem)                          |
+| SHINGEKI_HUB_READY_MIN_WORKERS | 2                    | Min workers for /ready to return true                  |
+| SHINGEKI_HUB_URL               | ws://localhost:8765  | Hub URL for workers and orchestrators                  |
+
+
+## Worker
+
+| Variable             | Default     | Description                                                        |
+|----------------------|-------------|--------------------------------------------------------------------|
+| NODE_ID              | random UUID | Worker identity                                                    |
+| NODE_ROLE            | general     | executor | critic | reasoning | memory | general               |
+| NODE_SPECIALIZATION  | —           | Comma-separated: research,planning,coding,defi                     |
+
+
+## Uniswap
+
+| Variable         | Description                                                                       |
+|------------------|-----------------------------------------------------------------------------------|
+| UNISWAP_API_KEY  | Required for DeFi preset. From https://developers.uniswap.org/dashboard           |
+| AGENT_WALLET     | Wallet address used as swapper in Uniswap quote requests                          |
+
+
+## AXL P2P
+
+| Variable              | Default                    | Description                                          |
+|-----------------------|----------------------------|------------------------------------------------------|
+| AXL_ENABLED           | false                      | true → use AXL P2P instead of WebSocket hub          |
+| AXL_API_URL           | http://127.0.0.1:9002      | AXL sidecar base URL                                 |
+| AXL_HUB_PEER_ID       | —                          | Hub peer ID (workers need this when AXL enabled)     |
+| AXL_WORKER_PEER_IDS   | —                          | Comma-separated worker peer IDs for run --mesh       |
+
+
+## Checkpoints
+
+| Variable                  | Default        | Description                               |
+|---------------------------|----------------|-------------------------------------------|
+| SHINGEKI_CHECKPOINT_DIR   | .checkpoints/  | Directory for crash-recovery checkpoints  |
+
+
+## Logging
+
+| Variable    | Default | Description                                           |
+|-------------|---------|-------------------------------------------------------|
+| LOG_LEVEL   | info    | debug | info | warn | error                          |
+| LOG_PRETTY  | —       | 1 → human-readable logs instead of JSON lines         |
+
+
+================================================================================
+PAGE 12 — FULL API REFERENCE
+================================================================================
+
+# API Reference
+
+Install: npm install shingeki
+
+
+## MeshOrchestrator
+
+  import { MeshOrchestrator } from 'shingeki';
+
+  const orch = new MeshOrchestrator(nodes);
+
+  await orch.executePlan(plan, stepExecutor, options);
+  // options.log             — (msg: string) => void
+  // options.onGenomeUpdate  — (genome: Genome) => void
+  // options.nextStepIndex   — resume from this step (default 0)
+  // options.priorResults    — prior results for resume
+
+
+## NodeRuntime
+
+  import { NodeRuntime } from 'shingeki';
+
+  const runtime = new NodeRuntime({ nodeId: 'node-1' }, genome);
+  const result = await runtime.executeStep(step);
+  // result.stepId     — string
+  // result.nodeId     — string
+  // result.output     — LLM response text (+ Uniswap quote if tool triggered)
+  // result.latencyMs  — number
+  // result.teeTrace   — 0G Router trace object
+  // result.evalResult — EvaluationResult after scoring
+
+
+## Genome functions
+
+  import { genomeFromConfig, evaluateOutput, heuristicScore, applyMutation, mutateGenome } from 'shingeki';
+
+  genomeFromConfig(config, id?)       // AgentMeshConfig → Genome
+  evaluateOutput(output, ctx?, thr?)  // string → Promise<EvaluationResult>
+  heuristicScore(output)              // string → number (0–1), synchronous
+  applyMutation(genome)               // Genome → Genome (one axis mutated)
+  mutateGenome(genome)                // Genome → Genome[] (all 3 variants)
+
+
+## Coordination — WebSocket
+
+  import {
+    MeshHub,
+    runWorkerHost,
+    openOrchestratorSession,
+    createMeshStepExecutor,
+    hubUrlFromEnv,
+  } from 'shingeki';
+
+  new MeshHub({ port, token?, tlsCert?, tlsKey? })
+  hub.listen()                     // → Promise<void>
+  hub.close()                      // shut down
+  hub.getLineage()                 // → LineageEntry[]
+
+  runWorkerHost({ hubUrl, token?, nodeId, role, specialization, genome })
+
+  openOrchestratorSession(url, token?)   // → Promise<WebSocket>
+  createMeshStepExecutor(ws)             // → StepExecutor
+  hubUrlFromEnv()                        // reads SHINGEKI_HUB_URL
+
+
+## Coordination — AXL P2P
+
+  import {
+    createAxlTransport,
+    runAxlWorkerHost,
+    runAxlOrchestratorSession,
+    createAxlStepExecutor,
+  } from 'shingeki';
+
+  createAxlTransport(apiUrl)                        // → AxlTransport
+  axl.getIdentity()                                 // → Promise<AxlIdentity>
+  axl.send(peerId, data)                            // → Promise<void>
+  axl.recv()                                        // → Promise<AxlMessage | null>
+  axl.recvWait(timeoutMs)                           // → Promise<AxlMessage>
+  axl.isReady()                                     // → Promise<boolean>
+
+  runAxlWorkerHost({ axl, hubPeerId, nodeId, specialization, genome })
+  runAxlOrchestratorSession({ axl, workerPeerIds }) // → Promise<AxlOrchestratorSession>
+  createAxlStepExecutor(session)                    // → StepExecutor
+
+
+## Uniswap tools
+
+  import { getUniswapQuote, buildUniswapSwap, checkUniswapApproval } from 'shingeki';
+
+  getUniswapQuote(params)                               // → Promise<UniswapQuoteResult>
+  buildUniswapSwap(quote)                               // → Promise<UniswapSwapTx>
+  checkUniswapApproval(token, amount, wallet, chainId)  // → Promise<UniswapSwapTx | null>
+
+
+## Plans / presets
+
+  import {
+    planResearchAnalyzeDecide,
+    planJapanTrip,
+    defiPlan,
+    splitCompoundTask,
+    planToRequiredRoles,
+    GPU_LLM_RESEARCH_GOAL,
+    JAPAN_TRIP_GOAL,
+    DEFI_SWAP_GOAL,
+  } from 'shingeki';
+
+  planResearchAnalyzeDecide(taskId)   // → Plan (4 steps: research x2, planning x2)
+  planJapanTrip(taskId)               // → Plan (6 steps: research, planning, coding)
+  defiPlan(taskId)                    // → Plan (4 steps: research x2, defi x2)
+  splitCompoundTask(taskId, text)     // → Plan (infers steps + domains from free-form text)
+  planToRequiredRoles(plan)           // → NodeCapability[] (how many nodes the plan needs)
+
+
+## Infra
+
+  import {
+    writeCheckpointAtomic,
+    readCheckpoint,
+    listCheckpointSummaries,
+    buildPriorContextFromResults,
+    createLogger,
+  } from 'shingeki';
+
+  writeCheckpointAtomic(dir, checkpoint)       // → Promise<void>
+  readCheckpoint(dir, taskId)                  // → Promise<DemoCheckpoint | null>
+  listCheckpointSummaries(dir)                 // → Promise<CheckpointSummary[]>
+  buildPriorContextFromResults(steps, results) // → string
+  createLogger(component)                      // → Logger
+
+
+## Types
+
+  import type {
+    Genome,               // { id, model, strategy, tools, reflection_depth, mutation_rate }
+    AgentMeshConfig,      // shape of agentmesh.yaml
+    Plan,                 // { taskId, steps }
+    Step,                 // { id, description, domain?, role?, title? }
+    StepResult,           // { stepId, nodeId, output, latencyMs, teeTrace?, evalResult? }
+    EvaluationResult,     // { score, path, reason?, tee_verified? }
+    LineageEntry,         // { genome_id, parent_id, model, strategy, fitness_score, ... }
+    NodeCapability,       // { id, capabilities, specialization?, role? }
+    NodeCapabilities,     // { role, latency_ms, cost_weight, specialization }
+    MeshMessage,          // { type: CoordinationEventType, payload }
+    UniswapQuoteParams,   // getUniswapQuote input
+    UniswapQuoteResult,   // getUniswapQuote output
+    UniswapSwapTx,        // { to, data, value, gasLimit }
+    DemoCheckpoint,       // checkpoint file shape
+    CheckpointSummary,    // list entry shape
+  } from 'shingeki';
+
+
+================================================================================
+EOF
+================================================================================

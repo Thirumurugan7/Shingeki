@@ -1,0 +1,1844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Shingeki — Documentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --black: oklch(4% 0.008 0);
+  --surface: oklch(8% 0.01 10);
+  --surface2: oklch(11% 0.012 10);
+  --surface3: oklch(15% 0.012 10);
+  --border: oklch(20% 0.015 10);
+  --border2: oklch(25% 0.012 10);
+  --red: oklch(48% 0.22 25);
+  --red-bright: oklch(58% 0.24 22);
+  --red-dim: oklch(35% 0.18 25);
+  --red-glow: oklch(48% 0.22 25 / 0.3);
+  --white: oklch(95% 0.004 60);
+  --muted: oklch(60% 0.008 60);
+  --muted2: oklch(42% 0.008 60);
+  --muted3: oklch(30% 0.008 60);
+  --blue: oklch(65% 0.18 220);
+  --green: oklch(65% 0.18 145);
+  --yellow: oklch(72% 0.18 85);
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --sidebar-w: 280px;
+  --content-max: 860px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--black);
+  color: var(--white);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+
+/* ── SCANLINES ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, oklch(0% 0 0 / 0.03) 2px, oklch(0% 0 0 / 0.03) 4px);
+  pointer-events: none; z-index: 9999;
+}
+
+/* ── TOP BAR ── */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 56px;
+  background: oklch(5% 0.009 0 / 0.97);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px 0 0;
+  z-index: 500;
+}
+
+.topbar-logo {
+  display: flex; align-items: center; gap: 0;
+  text-decoration: none;
+  width: var(--sidebar-w);
+  padding: 0 24px;
+  border-right: 1px solid var(--border);
+  height: 100%;
+}
+
+.topbar-logo-text {
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: 0.08em;
+  color: var(--white);
+}
+
+.topbar-logo-jp { color: var(--red-bright); margin-right: 6px; }
+
+.topbar-logo-dot {
+  width: 6px; height: 6px;
+  background: var(--red-bright);
+  border-radius: 50%;
+  margin-left: 8px;
+  box-shadow: 0 0 8px var(--red-bright);
+  animation: pulse 2s infinite;
+  flex-shrink: 0;
+}
+
+.topbar-right {
+  display: flex; align-items: center; gap: 16px;
+}
+
+.topbar-link {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted2);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.topbar-link:hover { color: var(--white); }
+
+.topbar-link.active { color: var(--red-bright); }
+
+.topbar-npm {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 7px 16px;
+  background: var(--red);
+  color: var(--white);
+  text-decoration: none;
+  transition: box-shadow 0.2s;
+}
+
+.topbar-npm:hover {
+  box-shadow: 0 0 16px var(--red-glow);
+}
+
+.topbar-gh {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 7px 16px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.topbar-gh:hover { color: var(--white); border-color: var(--muted2); }
+
+/* ── LAYOUT ── */
+.layout {
+  display: flex;
+  padding-top: 56px;
+  min-height: 100vh;
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  position: fixed;
+  top: 56px; left: 0; bottom: 0;
+  overflow-y: auto;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 24px 0 48px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.sidebar-section {
+  padding: 0 0 8px;
+  margin-bottom: 4px;
+}
+
+.sidebar-section-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--muted3);
+  padding: 12px 24px 6px;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 24px;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.15s, background 0.15s;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+}
+
+.sidebar-item:hover {
+  color: var(--white);
+  background: oklch(15% 0.01 10 / 0.5);
+}
+
+.sidebar-item.active {
+  color: var(--red-bright);
+  border-left-color: var(--red-bright);
+  background: oklch(48% 0.22 25 / 0.06);
+}
+
+.sidebar-item .num {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--muted3);
+  flex-shrink: 0;
+  width: 20px;
+}
+
+.sidebar-item.active .num { color: var(--red-dim); }
+
+/* ── MAIN CONTENT ── */
+.main {
+  flex: 1;
+  margin-left: var(--sidebar-w);
+  min-width: 0;
+}
+
+.page {
+  display: none;
+  padding: 60px 64px 120px;
+  max-width: var(--content-max);
+}
+
+.page.active { display: block; }
+
+/* ── PAGE HEADER ── */
+.page-num {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--red-bright);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-num::before {
+  content: '';
+  width: 28px; height: 1px;
+  background: var(--red-bright);
+}
+
+.page-title {
+  font-family: var(--font-display);
+  font-size: clamp(42px, 5vw, 64px);
+  letter-spacing: 0.04em;
+  line-height: 0.95;
+  color: var(--white);
+  margin-bottom: 32px;
+}
+
+.page-title .accent { color: var(--red-bright); }
+
+.page-divider {
+  height: 1px;
+  background: linear-gradient(90deg, var(--border), transparent);
+  margin: 40px 0;
+}
+
+/* ── TYPOGRAPHY ── */
+h2 {
+  font-family: var(--font-display);
+  font-size: 32px;
+  letter-spacing: 0.04em;
+  color: var(--white);
+  margin: 48px 0 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+h2:first-of-type { margin-top: 0; }
+
+h3 {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--red-bright);
+  margin: 32px 0 12px;
+}
+
+p {
+  color: var(--muted);
+  margin-bottom: 16px;
+  font-weight: 300;
+}
+
+p strong { color: var(--white); font-weight: 500; }
+
+ul, ol {
+  color: var(--muted);
+  padding-left: 24px;
+  margin-bottom: 16px;
+  font-weight: 300;
+}
+
+ul li, ol li { margin-bottom: 6px; }
+
+ul li strong, ol li strong { color: var(--white); font-weight: 500; }
+
+a { color: var(--red-bright); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── CODE BLOCKS ── */
+pre {
+  background: oklch(6% 0.009 0);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--red-dim);
+  padding: 20px 24px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.8;
+  overflow-x: auto;
+  margin: 16px 0 24px;
+  position: relative;
+  color: oklch(80% 0.005 60);
+}
+
+pre .c { color: var(--muted3); font-style: italic; }       /* comment */
+pre .k { color: oklch(65% 0.18 280); }                     /* keyword */
+pre .s { color: var(--green); }                             /* string */
+pre .n { color: var(--yellow); }                            /* number */
+pre .f { color: var(--blue); }                              /* function */
+pre .t { color: var(--red-bright); }                        /* type/import */
+pre .p { color: var(--muted); }                             /* punctuation */
+pre .e { color: oklch(70% 0.15 50); }                       /* env var */
+pre .hl { background: oklch(48% 0.22 25 / 0.1); display: block; margin: 0 -24px; padding: 0 24px; }
+
+code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--red-bright);
+  background: oklch(48% 0.22 25 / 0.1);
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+/* ── TABLES ── */
+.table-wrap {
+  overflow-x: auto;
+  margin: 16px 0 28px;
+  border: 1px solid var(--border);
+  position: relative;
+}
+
+.table-wrap::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, var(--red-bright), transparent);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+thead th {
+  padding: 12px 20px;
+  text-align: left;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted2);
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+tbody tr {
+  border-bottom: 1px solid oklch(20% 0.015 10 / 0.4);
+  transition: background 0.15s;
+}
+
+tbody tr:hover { background: oklch(12% 0.01 10 / 0.7); }
+tbody tr:last-child { border-bottom: none; }
+
+td {
+  padding: 11px 20px;
+  color: var(--muted);
+  vertical-align: top;
+  line-height: 1.6;
+}
+
+td:first-child { color: var(--white); font-weight: 500; white-space: nowrap; }
+td code { font-size: 11px; }
+
+/* ── BADGES ── */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 1px;
+  vertical-align: middle; margin: 0 2px;
+}
+
+.badge-red {
+  background: oklch(48% 0.22 25 / 0.15);
+  border: 1px solid var(--red-dim);
+  color: var(--red-bright);
+}
+
+.badge-green {
+  background: oklch(62% 0.2 145 / 0.1);
+  border: 1px solid oklch(62% 0.2 145 / 0.3);
+  color: var(--green);
+}
+
+.badge-blue {
+  background: oklch(65% 0.18 220 / 0.1);
+  border: 1px solid oklch(65% 0.18 220 / 0.3);
+  color: var(--blue);
+}
+
+.badge-yellow {
+  background: oklch(72% 0.18 85 / 0.1);
+  border: 1px solid oklch(72% 0.18 85 / 0.3);
+  color: var(--yellow);
+}
+
+/* ── CALLOUT BOXES ── */
+.callout {
+  padding: 16px 20px;
+  border-left: 2px solid;
+  margin: 20px 0;
+  font-size: 14px;
+  font-weight: 300;
+}
+
+.callout-note {
+  border-color: var(--blue);
+  background: oklch(65% 0.18 220 / 0.05);
+  color: oklch(72% 0.08 220);
+}
+
+.callout-warning {
+  border-color: var(--yellow);
+  background: oklch(72% 0.18 85 / 0.05);
+  color: oklch(72% 0.1 85);
+}
+
+.callout-tip {
+  border-color: var(--green);
+  background: oklch(62% 0.2 145 / 0.05);
+  color: oklch(68% 0.1 145);
+}
+
+.callout strong { color: var(--white); font-weight: 500; }
+
+/* ── PARAM TABLE (for API ref) ── */
+.param {
+  display: grid;
+  grid-template-columns: 180px 100px 1fr;
+  gap: 0;
+  border: 1px solid var(--border);
+  margin: 12px 0 24px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.param-row {
+  display: contents;
+}
+
+.param-row > div {
+  padding: 10px 16px;
+  border-bottom: 1px solid oklch(20% 0.015 10 / 0.4);
+  vertical-align: top;
+}
+
+.param-row:last-child > div { border-bottom: none; }
+
+.param-row > div:first-child { color: var(--red-bright); }
+.param-row > div:nth-child(2) { color: var(--blue); }
+.param-row > div:last-child { color: var(--muted); }
+
+/* ── STEP INDICATORS ── */
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 20px 0;
+}
+
+.step {
+  display: flex;
+  gap: 20px;
+  position: relative;
+}
+
+.step::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 32px;
+  bottom: -8px;
+  width: 1px;
+  background: var(--border);
+}
+
+.step:last-child::before { display: none; }
+
+.step-num {
+  width: 32px; height: 32px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--red-bright);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.step-body {
+  padding-bottom: 28px;
+  flex: 1;
+}
+
+.step-title {
+  font-weight: 500;
+  color: var(--white);
+  margin-bottom: 6px;
+}
+
+.step-desc { color: var(--muted); font-size: 14px; font-weight: 300; }
+
+/* ── INLINE PROP GRID ── */
+.prop-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  margin: 16px 0 24px;
+}
+
+.prop-cell {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 14px 18px;
+}
+
+.prop-cell-key {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--red-bright);
+  margin-bottom: 4px;
+  letter-spacing: 0.05em;
+}
+
+.prop-cell-val {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 300;
+  line-height: 1.5;
+}
+
+/* ── PAGE FOOTER NAV ── */
+.page-nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 80px;
+  padding-top: 32px;
+  border-top: 1px solid var(--border);
+}
+
+.page-nav-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 10px 20px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.page-nav-btn:hover {
+  color: var(--white);
+  border-color: var(--muted2);
+}
+
+.page-nav-btn.primary {
+  border-color: var(--red-dim);
+  color: var(--red-bright);
+}
+
+.page-nav-btn.primary:hover {
+  border-color: var(--red-bright);
+  box-shadow: 0 0 12px var(--red-glow);
+}
+
+/* ── SEARCH BAR ── */
+.search-wrap {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.search-input {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--white);
+  outline: none;
+  letter-spacing: 0.05em;
+  transition: border-color 0.2s;
+}
+
+.search-input::placeholder { color: var(--muted3); }
+.search-input:focus { border-color: var(--red-dim); }
+
+/* ── ANIMATIONS ── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ── MOBILE ── */
+@media (max-width: 900px) {
+  .sidebar { display: none; }
+  .main { margin-left: 0; }
+  .page { padding: 40px 24px 80px; }
+  .topbar-logo { width: auto; border-right: none; }
+  .topbar-link { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── TOP BAR ── -->
+<header class="topbar">
+  <a href="index.html" class="topbar-logo">
+    <span class="topbar-logo-jp">進撃</span>
+    <span class="topbar-logo-text">Shingeki</span>
+    <span class="topbar-logo-dot"></span>
+  </a>
+  <div class="topbar-right">
+    <a href="index.html" class="topbar-link">Home</a>
+    <a href="docs.html" class="topbar-link active">Docs</a>
+    <a href="https://github.com/Thirumurugan7/Shingeki" target="_blank" class="topbar-gh">GitHub</a>
+    <a href="https://www.npmjs.com/package/shingeki" target="_blank" class="topbar-npm">npm</a>
+  </div>
+</header>
+
+<div class="layout">
+
+<!-- ── SIDEBAR ── -->
+<aside class="sidebar">
+  <div class="search-wrap">
+    <input class="search-input" type="text" placeholder="Search docs..." id="search-input" />
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Overview</div>
+    <a class="sidebar-item active" data-page="1" href="#"><span class="num">01</span>Introduction</a>
+    <a class="sidebar-item" data-page="2" href="#"><span class="num">02</span>Core Concepts</a>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Getting Started</div>
+    <a class="sidebar-item" data-page="3" href="#"><span class="num">03</span>Getting Started</a>
+    <a class="sidebar-item" data-page="4" href="#"><span class="num">04</span>Programmatic API</a>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Core Systems</div>
+    <a class="sidebar-item" data-page="5" href="#"><span class="num">05</span>Genome &amp; Evolution</a>
+    <a class="sidebar-item" data-page="6" href="#"><span class="num">06</span>0G Integration</a>
+    <a class="sidebar-item" data-page="7" href="#"><span class="num">07</span>Uniswap Integration</a>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Infrastructure</div>
+    <a class="sidebar-item" data-page="8" href="#"><span class="num">08</span>Distributed Mesh</a>
+    <a class="sidebar-item" data-page="9" href="#"><span class="num">09</span>AXL P2P Transport</a>
+    <a class="sidebar-item" data-page="10" href="#"><span class="num">10</span>Lineage Viewer</a>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Reference</div>
+    <a class="sidebar-item" data-page="11" href="#"><span class="num">11</span>Environment Variables</a>
+    <a class="sidebar-item" data-page="12" href="#"><span class="num">12</span>Full API Reference</a>
+  </div>
+</aside>
+
+<!-- ── MAIN ── -->
+<main class="main">
+
+<!-- ════════════════════════════════════════════ PAGE 1 ════ -->
+<div class="page active" id="page-1">
+  <div class="page-num">01 — Overview</div>
+  <h1 class="page-title">What is <span class="accent">Shingeki?</span></h1>
+  <div class="page-divider"></div>
+
+  <p>Shingeki is a <strong>distributed cognitive mesh</strong> for multi-agent AI systems. Multiple nodes collaborate to solve multi-step tasks in parallel, each node running its own genome (model + strategy), competing on quality, and evolving automatically when output falls below threshold.</p>
+  <p>Every decision is logged to <strong>0G's tamper-proof storage</strong> so any participant can independently verify what ran, on what model, and with what result.</p>
+
+  <h2>The Problem It Solves</h2>
+  <p>Most AI agent frameworks run one LLM call after another on a single node with a static prompt. When quality drops, there is no recovery — the system just produces a bad answer. There is no competition, no evolution, and no on-chain proof.</p>
+  <p>Shingeki changes all three:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Problem</th><th>Shingeki's Answer</th></tr></thead>
+      <tbody>
+        <tr><td>Single point of failure</td><td>Multiple nodes compete — best output wins</td></tr>
+        <tr><td>Static prompts</td><td>Genome evolves when fitness score drops below threshold</td></tr>
+        <tr><td>No verification</td><td>Every step TEE-attested via 0G Router + logged to 0G Log Store</td></tr>
+        <tr><td>Siloed agents</td><td>Distributed mesh — nodes run on separate machines</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>How It Compares</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Framework</th><th>Architecture</th><th>Evolution</th><th>Verified</th></tr></thead>
+      <tbody>
+        <tr><td>LangChain</td><td>Single chain, single node</td><td>Static prompts</td><td><span class="badge badge-red">None</span></td></tr>
+        <tr><td>AutoGen</td><td>Agent pairs, static roles</td><td>Static</td><td><span class="badge badge-red">None</span></td></tr>
+        <tr><td>CrewAI</td><td>Fixed crew, sequential</td><td>Static</td><td><span class="badge badge-red">None</span></td></tr>
+        <tr><td><strong>Shingeki</strong></td><td>Distributed mesh</td><td>Genome-driven (live TEE scoring)</td><td><span class="badge badge-green">TEE ✓</span> <span class="badge badge-blue">0G Log</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="page-nav">
+    <div></div>
+    <button class="page-nav-btn primary" data-goto="2">Core Concepts →</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════ PAGE 2 ════ -->
+<div class="page" id="page-2">
+  <div class="page-num">02 — Core Concepts</div>
+  <h1 class="page-title">Core <span class="accent">Concepts</span></h1>
+  <div class="page-divider"></div>
+
+  <h2>Genome</h2>
+  <p>Every agent node runs with a <strong>genome</strong> — a configuration object that defines its identity:</p>
+<pre>{
+  <span class="k">id</span>: <span class="s">'genome-v1'</span>,
+  <span class="k">model</span>: <span class="s">'qwen/qwen-2.5-7b-instruct'</span>,
+  <span class="k">strategy</span>: <span class="s">'plan-execute-reflect'</span>,
+  <span class="k">tools</span>: [<span class="s">'web'</span>, <span class="s">'uniswap'</span>],
+  <span class="k">reflection_depth</span>: <span class="n">2</span>,
+  <span class="k">mutation_rate</span>: <span class="n">0.2</span>,
+}</pre>
+  <p>The genome starts from your <code>agentmesh.yaml</code> and mutates automatically when output quality drops below a configurable threshold. Every mutation is recorded to the lineage store and visible live in the browser viewer.</p>
+
+  <h2>Plan</h2>
+  <p>A task is broken into a sequence of steps, each tagged with a domain:</p>
+<pre>{
+  <span class="k">taskId</span>: <span class="s">'task-1234'</span>,
+  <span class="k">steps</span>: [
+    { <span class="k">id</span>: <span class="s">'task-1234-step-1'</span>, <span class="k">description</span>: <span class="s">'Research GPU options'</span>,  <span class="k">domain</span>: <span class="s">'research'</span>  },
+    { <span class="k">id</span>: <span class="s">'task-1234-step-2'</span>, <span class="k">description</span>: <span class="s">'Extract specs'</span>,         <span class="k">domain</span>: <span class="s">'research'</span>  },
+    { <span class="k">id</span>: <span class="s">'task-1234-step-3'</span>, <span class="k">description</span>: <span class="s">'Compare options'</span>,        <span class="k">domain</span>: <span class="s">'planning'</span>  },
+    { <span class="k">id</span>: <span class="s">'task-1234-step-4'</span>, <span class="k">description</span>: <span class="s">'Final recommendation'</span>,  <span class="k">domain</span>: <span class="s">'planning'</span>  },
+  ]
+}</pre>
+  <p>Domain tags drive routing — research steps go to research specialist nodes, planning steps to planning specialist nodes.</p>
+
+  <h2>Competition</h2>
+  <p>Step 1 of every plan runs on <strong>all available nodes in parallel</strong>. Each node produces a response, the fitness scorer evaluates all outputs, and the highest-scoring node's output chains into step 2. This is competition — quality selection before the work begins.</p>
+
+  <h2>Round-Robin Routing (Steps 2–N)</h2>
+  <p>After the competition step, subsequent steps route to domain-matched nodes in round-robin order with retry fallback. If a node fails, the orchestrator retries on the next available node.</p>
+
+  <h2>Fitness Scoring — Two Paths</h2>
+  <p>After every step, the output is evaluated by the fitness scorer:</p>
+
+  <div class="prop-grid">
+    <div class="prop-cell">
+      <div class="prop-cell-key">Path A — Heuristic <span class="badge badge-green">0 tokens</span></div>
+      <div class="prop-cell-val">Structural signals: response length, bullet points, numbers, tables, domain keywords. Fast, synchronous, no API call.</div>
+    </div>
+    <div class="prop-cell">
+      <div class="prop-cell-key">Path B — LLM Judge <span class="badge badge-red">TEE</span></div>
+      <div class="prop-cell-val">Only when heuristic score &lt; threshold (~128 tokens). TEE-verified via 0G Router. Returns {score, reason}.</div>
+    </div>
+  </div>
+
+  <h2>Genome Evolution</h2>
+  <p>If the score is below threshold (default <code>0.55</code>), the genome mutates before the next step. Mutations cycle through three axes:</p>
+  <ol>
+    <li><strong>Prompt</strong> — adjust the system instruction strategy</li>
+    <li><strong>Model</strong> — switch to the next fallback model</li>
+    <li><strong>Strategy</strong> — change the reasoning strategy</li>
+  </ol>
+
+  <h2>Verification</h2>
+  <p>Every step is:</p>
+  <ul>
+    <li><strong>TEE-attested</strong> — the 0G Router runs with <code>verify_tee: true</code>, producing a cryptographic trace</li>
+    <li><strong>Logged on-chain</strong> — full input/output/TEE flag/rootHash submitted to the 0G Log Store</li>
+    <li><strong>Checkpointed</strong> — atomic crash-recovery checkpoints let you resume any task after failure</li>
+  </ul>
+
+  <div class="page-nav">
+    <button class="page-nav-btn" data-goto="1">← Introduction</button>
+    <button class="page-nav-btn primary" data-goto="3">Getting Started →</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════ PAGE 3 ════ -->
+<div class="page" id="page-3">
+  <div class="page-num">03 — Getting Started</div>
+  <h1 class="page-title">Getting <span class="accent">Started</span></h1>
+  <div class="page-divider"></div>
+
+  <h2>Prerequisites</h2>
+  <ul>
+    <li>Node.js >= 22</li>
+    <li>A <code>ROUTER_API_KEY</code> from <a href="https://pc.0g.ai" target="_blank">pc.0g.ai</a> → Dashboard → API Keys</li>
+  </ul>
+
+  <h2>Install</h2>
+<pre>npm install shingeki</pre>
+
+  <h2>Set Your Environment Variables</h2>
+  <p>Create a <code>.env</code> file:</p>
+<pre><span class="c"># Required</span>
+<span class="e">ROUTER_API_KEY</span>=sk-your-key-here
+
+<span class="c"># Optional — enables on-chain logging to 0G Log Store + KV</span>
+<span class="e">PRIVATE_KEY</span>=0xYourWalletPrivateKey
+<span class="e">BLOCKCHAIN_RPC</span>=https://evmrpc-testnet.0g.ai
+<span class="e">INDEXER_RPC</span>=https://indexer-storage-testnet-turbo.0g.ai
+<span class="e">FLOW_CONTRACT</span>=0x22e03a6a89b950f1c82ec5e74f8eca321a105296
+<span class="e">KV_NODE_URL</span>=http://3.101.147.150:6789
+
+<span class="c"># Optional — DeFi preset</span>
+<span class="e">UNISWAP_API_KEY</span>=your-uniswap-api-key
+<span class="e">AGENT_WALLET</span>=0xYourWalletAddress</pre>
+
+  <div class="callout callout-tip"><strong>Tip:</strong> Get testnet OG tokens from <a href="https://faucet.0g.ai" target="_blank">faucet.0g.ai</a> if you want Log Store uploads to land on-chain.</div>
+
+  <h2>Run the Demo</h2>
+<pre><span class="c"># GPU research — find the best GPU under $1000 for local LLMs</span>
+npx shingeki demo
+
+<span class="c"># 5-day Japan trip planner under $1500</span>
+npx shingeki demo <span class="k">--preset</span> japan
+
+<span class="c"># DeFi swap analysis + Uniswap quote (needs UNISWAP_API_KEY)</span>
+npx shingeki demo <span class="k">--preset</span> defi
+
+<span class="c"># Run your own task</span>
+npx shingeki run <span class="k">--task</span> <span class="s">"Compare the top 3 L2s for a DeFi app launch"</span>
+
+<span class="c"># Resume after crash</span>
+npx shingeki demo <span class="k">--resume</span> task-1234567890</pre>
+
+  <h2>What You'll See</h2>
+<pre><span class="c">─── Shingeki run ───</span>
+Goal: Find the best GPU under $1000 for running local LLMs in 2026
+Preset: gpu | local (in-process nodes)
+
+Shingeki spawned 4 nodes: 2 research specialists, 2 planning specialists
+
+[Orchestrator] Plan:
+  <span class="n">1.</span> Search GPUs     <span class="p">(executor [research])</span>
+  <span class="n">2.</span> Extract specs   <span class="p">(executor [research])</span>
+  <span class="n">3.</span> Compare         <span class="p">(critic   [planning])</span>
+  <span class="n">4.</span> Recommend       <span class="p">(critic   [planning])</span>
+
+[Routing] Step 1 → PARALLEL node-1 + node-2
+[node-1] calling 0G Compute (qwen/qwen-2.5-7b-instruct) — 3.3s
+[node-2] calling 0G Compute (qwen/qwen-2.5-7b-instruct) — 3.3s
+[Orchestrator] competition scores: node-1=<span class="n">0.85</span>, node-2=<span class="n">0.85</span>
+[Orchestrator] winner → node-1
+
+[Verification]
+  Step 1 logged to 0G
+  Trace ID   : <span class="s">0xd7f342...</span>
+  Router TEE : <span class="k">true</span>
+  Eval score : <span class="n">0.85</span> <span class="p">(heuristic)</span>
+
+[0G KV] genome checkpoint written version 1777808537684
+
+<span class="c">─── Final synthesis ───</span>
+Recommendation: NVIDIA RTX 3060 — 12GB VRAM, 125W TDP, handles 7B and 13B models.</pre>
+
+  <div class="page-nav">
+    <button class="page-nav-btn" data-goto="2">← Core Concepts</button>
+    <button class="page-nav-btn primary" data-goto="4">Programmatic API →</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════ PAGE 4 ════ -->
+<div class="page" id="page-4">
+  <div class="page-num">04 — Programmatic API</div>
+  <h1 class="page-title">Programmatic <span class="accent">API</span></h1>
+  <div class="page-divider"></div>
+
+  <h2>Minimal Example — Run a Plan In-Process</h2>
+<pre><span class="t">import</span> <span class="s">'dotenv/config'</span>;
+<span class="t">import</span> { <span class="f">MeshOrchestrator</span>, <span class="f">NodeRuntime</span>, <span class="f">planResearchAnalyzeDecide</span> } <span class="t">from</span> <span class="s">'shingeki'</span>;
+
+<span class="k">const</span> genome = {
+  <span class="k">id</span>: <span class="s">'g1'</span>,
+  <span class="k">model</span>: <span class="s">'qwen/qwen-2.5-7b-instruct'</span>,
+  <span class="k">strategy</span>: <span class="s">'plan-execute-reflect'</span>,
+  <span class="k">tools</span>: [<span class="s">'web'</span>],
+  <span class="k">reflection_depth</span>: <span class="n">2</span>,
+  <span class="k">mutation_rate</span>: <span class="n">0.2</span>,
+};
+
+<span class="k">const</span> taskId = <span class="s">`task-${Date.now()}`</span>;
+<span class="k">const</span> plan = <span class="f">planResearchAnalyzeDecide</span>(taskId);
+
+<span class="k">const</span> nodes = [
+  { <span class="k">id</span>: <span class="s">'node-1'</span>, <span class="k">capabilities</span>: [<span class="s">'llm'</span>, <span class="s">'research'</span>], <span class="k">specialization</span>: [<span class="s">'research'</span>] },
+  { <span class="k">id</span>: <span class="s">'node-2'</span>, <span class="k">capabilities</span>: [<span class="s">'llm'</span>, <span class="s">'planning'</span>], <span class="k">specialization</span>: [<span class="s">'planning'</span>] },
+];
+
+<span class="k">const</span> orch = <span class="t">new</span> <span class="f">MeshOrchestrator</span>(nodes);
+<span class="k">let</span> currentGenome = genome;
+
+<span class="k">const</span> results = <span class="k">await</span> orch.<span class="f">executePlan</span>(
+  plan,
+  <span class="k">async</span> ({ node, step }) => {
+    <span class="k">const</span> runtime = <span class="t">new</span> <span class="f">NodeRuntime</span>({ nodeId: node.id }, currentGenome);
+    <span class="k">return</span> runtime.<span class="f">executeStep</span>(step);
+  },
+  {
+    <span class="k">log</span>: (msg) => console.<span class="f">log</span>(msg),
+    <span class="k">onGenomeUpdate</span>: (g) => { currentGenome = g; },
+  },
+);
+
+console.<span class="f">log</span>(results.<span class="f">at</span>(-<span class="n">1</span>)?.output);</pre>
+
+  <h2>Load Genome from YAML</h2>
+<pre><span class="t">import</span> { <span class="f">genomeFromConfig</span> } <span class="t">from</span> <span class="s">'shingeki'</span>;
+<span class="t">import</span> { parse } <span class="t">from</span> <span class="s">'yaml'</span>;
+<span class="t">import</span> { readFileSync } <span class="t">from</span> <span class="s">'node:fs'</span>;
+
+<span class="k">const</span> cfg = <span class="f">parse</span>(<span class="f">readFileSync</span>(<span class="s">'agentmesh.example.yaml'</span>, <span class="s">'utf8'</span>));
+<span class="k">const</span> genome = <span class="f">genomeFromConfig</span>(cfg, <span class="s">'my-genome-v1'</span>);</pre>
+
+  <p><strong>agentmesh.example.yaml:</strong></p>
+<pre>agent:
+  name: research-agent
+  strategy: plan-execute-reflect
+
+genome:
+  model: qwen/qwen-2.5-7b-instruct
+  tools: [web, code]
+  reflection_depth: 2
+  mutation_rate: 0.2
+
+mesh:
+  min_nodes: 2</pre>
+
+  <h2>Split a Free-Form Task Into a Plan</h2>
+<pre><span class="t">import</span> { <span class="f">splitCompoundTask</span> } <span class="t">from</span> <span class="s">'shingeki'</span>;
+
+<span class="k">const</span> plan = <span class="f">splitCompoundTask</span>(
+  <span class="s">'task-001'</span>,
+  <span class="s">'Research Ethereum L2s; Compare fees and TPS; Recommend the best one for a DeFi launch'</span>,
+);
+
+<span class="c">// Each step gets a domain tag automatically:</span>
+<span class="c">// step 1 → domain: 'research'</span>
+<span class="c">// step 2 → domain: 'planning'</span>
+<span class="c">// step 3 → domain: 'planning'</span></pre>
+
+  <h2>Use a Built-In Preset Plan</h2>
+<pre><span class="t">import</span> {
+  planResearchAnalyzeDecide,  <span class="c">// 4-step research + recommendation pipeline</span>
+  planJapanTrip,              <span class="c">// 6-step travel planner</span>
+  defiPlan,                   <span class="c">// 4-step DeFi swap analysis</span>
+} <span class="t">from</span> <span class="s">'shingeki'</span>;
+
+<span class="k">const</span> plan = <span class="f">defiPlan</span>(<span class="s">`task-${Date.now()}`</span>);</pre>
+
+  <h2>Evaluate Output and Evolve the Genome Manually</h2>
+<pre><span class="t">import</span> { <span class="f">evaluateOutput</span>, <span class="f">applyMutation</span> } <span class="t">from</span> <span class="s">'shingeki'</span>;
+
+<span class="k">const</span> result = <span class="k">await</span> <span class="f">evaluateOutput</span>(stepOutput, taskContext, <span class="n">0.55</span>);
+<span class="c">// result.score        — 0.0 to 1.0</span>
+<span class="c">// result.path         — 'heuristic' | 'llm'</span>
+<span class="c">// result.tee_verified — true when LLM judge path ran</span>
+
+<span class="k">if</span> (result.score < <span class="n">0.55</span>) {
+  <span class="k">const</span> evolved = <span class="f">applyMutation</span>(currentGenome);
+  <span class="c">// evolved.id       — new genome id</span>
+  <span class="c">// evolved.model    — may have changed</span>
+  <span class="c">// evolved.strategy — may have changed</span>
+}</pre>
+
+  <h2>Resume After Crash</h2>
+<pre><span class="t">import</span> {
+  readCheckpoint,
+  buildPriorContextFromResults,
+  listCheckpointSummaries,
+} <span class="t">from</span> <span class="s">'shingeki'</span>;
+
+<span class="c">// List all saved tasks</span>
+<span class="k">const</span> saved = <span class="k">await</span> <span class="f">listCheckpointSummaries</span>(<span class="s">'.checkpoints'</span>);
+console.<span class="f">log</span>(saved.<span class="f">map</span>(s => <span class="s">`${s.taskId} — step ${s.nextStepIndex}/${s.totalSteps}`</span>));
+
+<span class="c">// Resume a specific task</span>
+<span class="k">const</span> checkpoint = <span class="k">await</span> <span class="f">readCheckpoint</span>(<span class="s">'.checkpoints'</span>, <span class="s">'task-1234567890'</span>);
+<span class="k">if</span> (checkpoint) {
+  <span class="k">const</span> priorContext = <span class="f">buildPriorContextFromResults</span>(plan.steps, checkpoint.results);
+  <span class="c">// pass priorContext into executePlan to continue from where it stopped</span>
+}</pre>
+
+  <div class="page-nav">
+    <button class="page-nav-btn" data-goto="3">← Getting Started</button>
+    <button class="page-nav-btn primary" data-goto="5">Genome &amp; Evolution →</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════ PAGE 5 ════ -->
+<div class="page" id="page-5">
+  <div class="page-num">05 — Genome &amp; Evolution</div>
+  <h1 class="page-title">Genome &amp; <span class="accent">Evolution</span></h1>
+  <div class="page-divider"></div>
+
+  <h2>Genome Fields</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>id</td><td>string</td><td>Unique identifier, increments on mutation (genome-v1, v2, …)</td></tr>
+        <tr><td>model</td><td>string</td><td>LLM model name sent to 0G Router</td></tr>
+        <tr><td>strategy</td><td>string</td><td>Reasoning strategy (e.g. plan-execute-reflect, chain-of-thought)</td></tr>
+        <tr><td>tools</td><td>string[]</td><td>Enabled tools: web, code, uniswap</td></tr>
+        <tr><td>reflection_depth</td><td>number</td><td>How many reflection passes the node runs</td></tr>
+        <tr><td>mutation_rate</td><td>number</td><td>Probability weight for mutation selection</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Fitness Scorer — Heuristic Path</h2>
+  <p>Scores structural signals of the output text. Synchronous, zero tokens:</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Signal</th><th>Max Contribution</th></tr></thead>
+      <tbody>
+        <tr><td>Response length ≥ 80 chars</td><td>Base 0.2</td></tr>
+        <tr><td>Line count</td><td>+0.02/line, max 0.25</td></tr>
+        <tr><td>Bullet points</td><td>+0.04/bullet, max 0.20</td></tr>
+        <tr><td>Numbers / figures</td><td>+0.02/number, max 0.15</td></tr>
+        <tr><td>Domain keywords (GPU specs, DeFi terms, travel)</td><td>+0.03/match, max 0.20</td></tr>
+        <tr><td>Markdown tables</td><td>+0.05/row, max 0.10</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Fitness Scorer — LLM Judge Path</h2>
+  <p>Triggered only when heuristic score &lt; threshold (default <code>0.55</code>). Sends the step output to 0G Router with <code>verify_tee: true</code> and receives <code>{"{ score, reason }"}</code>. The <code>tee_verified</code> flag is stored on the step result.</p>
+
+  <h2>Mutation Axes</h2>
+  <p>When a step scores below threshold, the genome mutates before the next step. Mutations cycle through three axes in order:</p>
+<pre>genome-v1 (score <span class="n">0.42</span>) → mutate <span class="k">prompt</span>   → genome-v2
+genome-v2 (score <span class="n">0.48</span>) → mutate <span class="k">model</span>    → genome-v3
+genome-v3 (score <span class="n">0.51</span>) → mutate <span class="k">strategy</span> → genome-v4
+genome-v4 (score <span class="n">0.71</span>) → promoted ✓</pre>
+
+  <div class="prop-grid">
+    <div class="prop-cell">
+      <div class="prop-cell-key">Prompt Mutation</div>
+      <div class="prop-cell-val">Adjusts the system instruction to be more structured or precise</div>
+    </div>
+    <div class="prop-cell">
+      <div class="prop-cell-key">Model Mutation</div>
+      <div class="prop-cell-val">Switches to the next fallback model from FALLBACK_MODELS list</div>
+    </div>
+    <div class="prop-cell">
+      <div class="prop-cell-key">Strategy Mutation</div>
+      <div class="prop-cell-val">Changes the reasoning strategy string passed to the prompt builder</div>
+    </div>
+    <div class="prop-cell">
+      <div class="prop-cell-key">Lineage Recording</div>
+      <div class="prop-cell-val">Every mutation appended to lineage store, visible live at /viewer</div>
+    </div>
+  </div>
+
+  <h2>Lineage Store Entry</h2>
+<pre>{
+  <span class="k">genome_id</span>: <span class="s">'genome-v3'</span>,
+  <span class="k">parent_id</span>: <span class="s">'genome-v2'</span>,
+  <span class="k">model</span>: <span class="s">'meta-llama/llama-3.1-8b-instruct'</span>,
+  <span class="k">strategy</span>: <span class="s">'chain-of-thought'</span>,
+  <span class="k">fitness_score</span>: <span class="n">0.51</span>,
+  <span class="k">tee_verified</span>: <span class="k">true</span>,
+  <span class="k">timestamp</span>: <span class="n">1746000000000</span>,
+  <span class="k">step_count</span>: <span class="n">3</span>,
+}</pre>
+
+  <p>Exposed at <code>GET /lineage</code> on the hub and rendered live in the browser viewer at <code>http://localhost:8765/viewer</code>.</p>
+
+  <h2>Configuring the Threshold</h2>
+<pre><span class="e">SHINGEKI_EVOLVE_THRESHOLD</span>=<span class="n">0.60</span>   <span class="c"># stricter — mutate more often</span>
+<span class="e">SHINGEKI_EVOLVE_THRESHOLD</span>=<span class="n">0.40</span>   <span class="c"># lenient  — only mutate on very poor output</span></pre>
+
+  <div class="page-nav">
+    <button class="page-nav-btn" data-goto="4">← Programmatic API</button>
+    <button class="page-nav-btn primary" data-goto="6">0G Integration →</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════ PAGE 6 ════ -->
+<div class="page" id="page-6">
+  <div class="page-num">06 — 0G Integration</div>
+  <h1 class="page-title">0G <span class="accent">Integration</span></h1>
+  <div class="page-divider"></div>
+
+  <p>Shingeki uses three 0G primitives: the <strong>Router</strong> for every LLM call, the <strong>Log Store</strong> for per-step execution traces, and the <strong>KV Store</strong> for genome checkpoints.</p>
+
+  <h2>0G Router</h2>
+  <p>Every LLM call goes through the 0G Router at <code>router-api.0g.ai/v1</code>. Two flags are always on:</p>
+  <ul>
+    <li><code>verify_tee: true</code> — validates TEE attestation server-side; returns <code>tee_verified</code> boolean</li>
+    <li><code>provider: {"{ sort: \"latency\" }"}</code> — auto-selects the fastest available provider</li>
+  </ul>
+<pre><span class="k">const</span> result = <span class="k">await</span> <span class="f">routerInfer</span>(prompt, systemPrompt, {
+  <span class="k">model</span>: genome.model,
+  <span class="k">max_tokens</span>: <span class="n">1024</span>,
+  <span class="k">verify_tee</span>: <span class="k">true</span>,
+  <span class="k">provider</span>: { <span class="k">sort</span>: <span class="s">'latency'</span> },
+});
+
+result.text                 <span class="c">// LLM response text</span>
+result.trace.tee_verified   <span class="c">// true | false</span></pre>
+
+  <h2>0G Log Store</h2>
+  <p>After every completed step, the full execution trace is uploaded:</p>
+<pre>{
+  <span class="k">step</span>: <span class="n">1</span>,
+  <span class="k">node</span>: <span class="s">'node-1'</span>,
+  <span class="k">input</span>: <span class="s">'...prompt...'</span>,
+  <span class="k">output</span>: <span class="s">'...response...'</span>,
+  <span class="k">tee_verified</span>: <span class="k">true</span>,
+  <span class="k">timestamp</span>: <span class="n">1746000000000</span>,
+  <span class="k">rootHash</span>: <span class="s">'0xd7f342...'</span>,
+}</pre>
+  <p>The <code>rootHash</code> is content-addressed — anyone can verify the trace by hashing the payload and comparing to the on-chain rootHash.</p>
+
+  <h2>0G KV Store</h2>
+  <p>After the task completes, the final genome state is written to the KV Store as a checkpoint:</p>
+<pre>[0G KV] genome checkpoint written version <span class="n">1777808537684</span></pre>
+
+  <h2>Setup for On-Chain Verification</h2>
+<pre><span class="e">PRIVATE_KEY</span>=0xYourWalletPrivateKey
+<span class="e">BLOCKCHAIN_RPC</span>=https://evmrpc-testnet.0g.ai
+<span class="e">INDEXER_RPC</span>=https://indexer-storage-testnet-turbo.0g.ai
+<span class="e">FLOW_CONTRACT</span>=0x22e03a6a89b950f1c82ec5e74f8eca321a105296
+<span class="e">KV_NODE_URL</span>=http://3.101.147.150:6789</pre>
+
+  <div class="callout callout-note"><strong>Note:</strong> Without <code>PRIVATE_KEY</code>, all LLM calls still run through the 0G Router with full TEE verification. Only Log Store and KV uploads are skipped.</div>
+
+  <h2>0G Primitives Summary</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Primitive</th><th>Endpoint</th><th>Used For</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><td>0G Router</td><td>router-api.0g.ai/v1</td><td>Every LLM step + fitness judge</td><td>Every plan step</td></tr>
+        <tr><td>TEE attestation</td><td>via Router verify_tee: true</td><td>Proof of execution</td><td>Always on</td></tr>
+        <tr><td>0G Log Store</td><td>@0gfoundation/0g-ts-sdk</td><td>Per-step trace (append-only)</td><td>After each step</td></tr>
+        <tr><td>0G KV Store</td><td>@0gfoundation/0g-ts-sdk</td><td>Final genome state</td><td>After task completes</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="page-nav">
+    <button class="page-nav-btn" data-goto="5">← Genome &amp; Evolution</button>
+    <button class="page-nav-btn primary" data-goto="7">Uniswap Integration →</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════ PAGE 7 ════ -->
+<div class="page" id="page-7">
+  <div class="page-num">07 — Uniswap Integration</div>
+  <h1 class="page-title">Uniswap <span class="accent">Integration</span></h1>
+  <div class="page-divider"></div>
+
+  <p>Shingeki includes a first-class <strong>Uniswap Trade API integration</strong>. When <code>'uniswap'</code> is in the genome's tool list, the NodeRuntime automatically detects embedded tool calls in LLM output and executes them — no manual wiring needed.</p>
+
+  <h2>How It Works</h2>
+  <p>The LLM embeds a JSON block in its response when a swap quote is relevant:</p>
+<pre>{
+  <span class="s">"tool"</span>: <span class="s">"uniswap_quote"</span>,
+  <span class="s">"tokenIn"</span>: <span class="s">"0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"</span>,
+  <span class="s">"tokenOut"</span>: <span class="s">"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"</span>,
+  <span class="s">"amount"</span>: <span class="s">"1000000000000000000"</span>,
+  <span class="s">"chainId"</span>: <span class="n">1</span>,
+  <span class="s">"swapper"</span>: <span class="s">"0xYourWalletAddress"</span>
+}</pre>
+
+  <p>Quote summary appended automatically to the step output:</p>
+<pre><span class="k">**Uniswap Quote:**</span>
+routing=V3 | tokenIn=<span class="n">1.0</span> WETH | tokenOut=<span class="n">3,241.50</span> USDC | gas=<span class="s">$2.14</span> | priceImpact=<span class="n">0.03</span>%</pre>
+
+  <h2>Enable the Uniswap Tool</h2>
+<pre><span class="c"># .env</span>
+<span class="e">UNISWAP_API_KEY</span>=your-api-key-from-developers.uniswap.org
+<span class="e">AGENT_WALLET</span>=0xYourWalletAddress
+
+<span class="c">// In your genome config</span>
+<span class="k">const</span> genome = {
+  <span class="k">id</span>: <span class="s">'g1'</span>,
+  <span class="k">model</span>: <span class="s">'qwen/qwen-2.5-7b-instruct'</span>,
+  <span class="k">strategy</span>: <span class="s">'plan-execute-reflect'</span>,
+  <span class="k">tools</span>: [<span class="s">'web'</span>, <span class="hl"><span class="s">'uniswap'</span></span>],
+  <span class="k">reflection_depth</span>: <span class="n">2</span>,
+  <span class="k">mutation_rate</span>: <span class="n">0.2</span>,
+};</pre>
+
+  <h2>Direct API Usage</h2>
+<pre><span class="t">import</span> { <span class="f">getUniswapQuote</span>, <span class="f">buildUniswapSwap</span>, <span class="f">checkUniswapApproval</span> } <span class="t">from</span> <span class="s">'shingeki'</span>;
+
+<span class="c">// Step 1 — get a quote</span>
+<span class="k">const</span> quote = <span class="k">await</span> <span class="f">getUniswapQuote</span>({
+  <span class="k">tokenIn</span>:  <span class="s">'0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'</span>, <span class="c">// WETH</span>
+  <span class="k">tokenOut</span>: <span class="s">'0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'</span>, <span class="c">// USDC</span>
+  <span class="k">amount</span>:   <span class="s">'1000000000000000000'</span>,                        <span class="c">// 1 ETH in wei</span>
+  <span class="k">chainId</span>:  <span class="n">1</span>,
+  <span class="k">swapper</span>:  <span class="s">'0xYourWalletAddress'</span>,
+  <span class="k">slippageTolerance</span>: <span class="n">0.5</span>,
+});
+
+console.<span class="f">log</span>(quote.routing);          <span class="c">// 'V3' | 'V4' | 'DUTCH_V2' | ...</span>
+console.<span class="f">log</span>(quote.tokenOut.amount);  <span class="c">// USDC out amount</span>
+console.<span class="f">log</span>(quote.gasFeeUSD);        <span class="c">// estimated gas cost in USD</span>
+
+<span class="c">// Step 2 — build the swap calldata</span>
+<span class="k">const</span> tx = <span class="k">await</span> <span class="f">buildUniswapSwap</span>(quote);
+console.<span class="f">log</span>(tx.to);       <span class="c">// router contract address</span>
+console.<span class="f">log</span>(tx.data);     <span class="c">// encoded calldata</span>
+console.<span class="f">log</span>(tx.gasLimit); <span class="c">// estimated gas</span>
+
+<span class="c">// Step 3 — check approval</span>
+<span class="k">const</span> approval = <span class="k">await</span> <span class="f">checkUniswapApproval</span>(
+  quote.tokenIn.token, quote.tokenIn.amount, <span class="s">'0xYourWalletAddress'</span>, <span class="n">1</span>,
+);</pre>
+
+  <div class="callout callout-warning"><strong>Routing Guard:</strong> Dutch order routing (DUTCH_V2, DUTCH_V3, PRIORITY) is blocked in the current release — requires off-chain order signing. Classic routing (V4, V3, V2) is fully supported.</div>
+
+  <div class="page-nav">
+    <button class="page-nav-btn" data-goto="6">← 0G Integration</button>
+    <button class="page-nav-btn primary" data-goto="8">Distributed Mesh →</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════ PAGE 8 ════ -->
+<div class="page" id="page-8">
+  <div class="page-num">08 — Distributed Mesh</div>
+  <h1 class="page-title">Distributed <span class="accent">Mesh</span></h1>
+  <div class="page-divider"></div>
+
+  <p>Run agent nodes across multiple machines. The orchestrator routes plan steps to whichever node has the right specialization, with automatic retry if a node fails.</p>
+
+  <h2>Architecture</h2>
+<pre>Hub (machine 1)
+  ├── WebSocket server for workers + orchestrators
+  ├── HTTP: /health /ready /metrics /status /lineage /viewer /api/run
+  └── Lineage viewer (browser UI)
+
+Worker A (machine 2) — research specialist
+Worker B (machine 3) — planning specialist
+
+Orchestrator (machine 4) — dispatches plan steps</pre>
+
+  <h2>Step 1 — Start the Hub</h2>
+<pre><span class="e">SHINGEKI_HUB_TOKEN</span>=my-secret npx shingeki hub
+
+<span class="c"># Custom port and bind address</span>
+<span class="e">SHINGEKI_HUB_PORT</span>=<span class="n">9000</span> <span class="e">SHINGEKI_HUB_HOST</span>=<span class="s">0.0.0.0</span> npx shingeki hub</pre>
+  <p>The hub starts on port <code>8765</code> by default. The genome lineage viewer opens automatically at <code>http://localhost:8765/viewer</code>.</p>
+
+  <h2>Step 2 — Start Worker Nodes</h2>
+<pre><span class="c"># Worker A — research specialist</span>
+<span class="e">NODE_ID</span>=node-1 \
+<span class="e">NODE_ROLE</span>=executor \
+<span class="e">NODE_SPECIALIZATION</span>=research \
+<span class="e">SHINGEKI_HUB_URL</span>=ws://hub-host:8765 \
+<span class="e">SHINGEKI_HUB_TOKEN</span>=my-secret \
+npx shingeki node
+
+<span class="c"># Worker B — planning specialist</span>
+<span class="e">NODE_ID</span>=node-2 \
+<span class="e">NODE_ROLE</span>=reasoning \
+<span class="e">NODE_SPECIALIZATION</span>=planning \
+<span class="e">SHINGEKI_HUB_URL</span>=ws://hub-host:8765 \
+<span class="e">SHINGEKI_HUB_TOKEN</span>=my-secret \
+npx shingeki node</pre>
+
+  <h2>Step 3 — Run a Task Against the Mesh</h2>
+<pre><span class="e">SHINGEKI_HUB_URL</span>=ws://hub-host:8765 \
+<span class="e">SHINGEKI_HUB_TOKEN</span>=my-secret \
+npx shingeki demo <span class="k">--mesh</span></pre>
+
+  <h2>Submit via HTTP</h2>
+<pre>curl -X POST http://hub-host:8765/api/run \
+  -H <span class="s">"Authorization: Bearer my-secret"</span> \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{ "task": "Compare the top 3 Ethereum L2s", "mesh": true }'</span></pre>
+
+  <h2>Hub HTTP Endpoints</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Endpoint</th><th>Method</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>/health</td><td>GET</td><td>{"{ \"ok\": true }"}</td></tr>
+        <tr><td>/ready</td><td>GET</td><td>{"{ \"ready\": true }"} when minimum workers connected</td></tr>
+        <tr><td>/metrics</td><td>GET</td><td>Prometheus text format</td></tr>
+        <tr><td>/status</td><td>GET</td><td>JSON snapshot — worker list, lineage count</td></tr>
+        <tr><td>/lineage</td><td>GET</td><td>Full genome lineage array</td></tr>
+        <tr><td>/viewer</td><td>GET</td><td>Self-contained browser lineage viewer</td></tr>
+        <tr><td>/checkpoints</td><td>GET</td><td>List task checkpoint summaries</td></tr>
+        <tr><td>/checkpoint?id=task-…</td><td>GET</td><td>Single checkpoint JSON</td></tr>
+        <tr><td>/api/run</td><td>POST</td><td>Submit a task, returns step results</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Node Roles &amp; Specializations</h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+    <div class="table-wrap" style="margin:0;">
+      <table>
+        <thead><tr><th>Role</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td>executor</td><td>Research and data-gathering</td></tr>
+          <tr><td>critic</td><td>Evaluates, compares, recommends</td></tr>
+          <tr><td>reasoning</td><td>Planning and multi-step analysis</td></tr>
+          <tr><td>memory</td><td>Context aggregation</td></tr>
+          <tr><td>general</td><td>Handles any step type</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="table-wrap" style="margin:0;">
+      <table>
+        <thead><tr><th>Specialization</th><th>Best for</th></tr></thead>
+        <tbody>
+          <tr><td>research</td><td>Web search, fact extraction</td></tr>
+          <tr><td>planning</td><td>Strategy, recommendation</td></tr>
+          <tr><td>coding</td><td>Code generation, debugging</td></tr>
+          <tr><td>defi</td><td>DeFi analysis, token routing</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2>Production Security</h2>
+<pre><span class="e">NODE_ENV</span>=production
+<span class="e">SHINGEKI_HUB_TOKEN</span>=a-strong-random-secret
+<span class="e">SHINGEKI_HUB_STRICT_HTTP_AUTH</span>=<span class="n">1</span>
+<span class="e">SHINGEKI_HUB_TLS_CERT</span>=/path/to/fullchain.pem
+<span class="e">SHINGEKI_HUB_TLS_KEY</span>=/path/to/privkey.pem</pre>
+
+  <div class="page-nav">
+    <button class="page-nav-btn" data-goto="7">← Uniswap Integration</button>
+    <button class="page-nav-btn primary" data-goto="9">AXL P2P Transport →</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════ PAGE 9 ════ -->
+<div class="page" id="page-9">
+  <div class="page-num">09 — AXL P2P Transport</div>
+  <h1 class="page-title">AXL P2P <span class="accent">Transport</span></h1>
+  <div class="page-divider"></div>
+
+  <p>AXL replaces the WebSocket hub with <strong>broker-free peer-to-peer transport</strong> via the Gensyn AXL sidecar. No central hub process is needed — workers and orchestrators discover and communicate directly.</p>
+
+  <h2>WebSocket Hub vs AXL P2P</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>WebSocket Hub</th><th>AXL P2P</th></tr></thead>
+      <tbody>
+        <tr><td>Setup complexity</td><td>Low — one hub process</td><td>Medium — sidecar on each machine</td></tr>
+        <tr><td>Central broker</td><td>Yes</td><td>No</td></tr>
+        <tr><td>Best for</td><td>Local dev, single datacenter</td><td>Multi-region, decentralised</td></tr>
+        <tr><td>Requires</td><td>npm run hub</td><td>Gensyn AXL sidecar binary</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Enable AXL</h2>
+<pre><span class="e">AXL_ENABLED</span>=<span class="k">true</span>                    <span class="c"># use AXL instead of WebSocket</span>
+<span class="e">AXL_API_URL</span>=http://127.0.0.1:9002   <span class="c"># AXL sidecar URL (default)</span></pre>
+
+  <h2>Start Hub with AXL</h2>
+<pre><span class="e">AXL_ENABLED</span>=<span class="k">true</span> npx shingeki hub
+<span class="c"># Prints: AXL peer ID: 12D3Koo...</span></pre>
+
+  <h2>Start Workers with AXL</h2>
+<pre><span class="e">AXL_ENABLED</span>=<span class="k">true</span> \
+<span class="e">AXL_HUB_PEER_ID</span>=12D3Koo... \
+<span class="e">NODE_ID</span>=node-1 \
+<span class="e">NODE_SPECIALIZATION</span>=research \
+npx shingeki node</pre>
+
+  <h2>Programmatic AXL Usage</h2>
+<pre><span class="t">import</span> {
+  <span class="f">createAxlTransport</span>, <span class="f">runAxlWorkerHost</span>,
+  <span class="f">runAxlOrchestratorSession</span>, <span class="f">createAxlStepExecutor</span>,
+} <span class="t">from</span> <span class="s">'shingeki'</span>;
+
+<span class="k">const</span> axl = <span class="f">createAxlTransport</span>(<span class="s">'http://127.0.0.1:9002'</span>);
+<span class="k">const</span> identity = <span class="k">await</span> axl.<span class="f">getIdentity</span>();
+console.<span class="f">log</span>(identity.peerId);
+
+<span class="c">// Start a worker</span>
+<span class="k">await</span> <span class="f">runAxlWorkerHost</span>({
+  axl, <span class="k">hubPeerId</span>: <span class="s">'hub-peer-id'</span>,
+  <span class="k">nodeId</span>: <span class="s">'node-1'</span>, <span class="k">specialization</span>: [<span class="s">'research'</span>], genome,
+});
+
+<span class="c">// Start an orchestrator session</span>
+<span class="k">const</span> session = <span class="k">await</span> <span class="f">runAxlOrchestratorSession</span>({
+  axl, <span class="k">workerPeerIds</span>: [<span class="s">'worker-1-peer-id'</span>, <span class="s">'worker-2-peer-id'</span>],
+});
+<span class="k">const</span> executor = <span class="f">createAxlStepExecutor</span>(session);</pre>
+
+  <h2>AXL Message Protocol</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Message</th><th>Direction</th><th>Payload</th></tr></thead>
+      <tbody>
+        <tr><td>NODE_JOIN</td><td>Worker → Hub/Orch</td><td>{"{ nodeId, role, specialization }"}</td></tr>
+        <tr><td>ORCH_JOIN</td><td>Orchestrator → Workers</td><td>{"{ orchestratorPeerId }"}</td></tr>
+        <tr><td>ORCH_WORKERS</td><td>Hub → Orchestrator</td><td>{"{ workers: NodeCapabilities[] }"}</td></tr>
+        <tr><td>TASK_ASSIGN</td><td>Orchestrator → Worker</td><td>{"{ step, priorContext }"}</td></tr>
+        <tr><td>STEP_RESULT</td><td>Worker → Orchestrator</td><td>{"{ stepId, output, latencyMs, teeTrace }"}</td></tr>
+        <tr><td>HEARTBEAT</td><td>Worker → Hub</td><td>{}</td></tr>
+        <tr><td>HEARTBEAT_ACK</td><td>Hub → Worker</td><td>{}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="page-nav">
+    <button class="page-nav-btn" data-goto="8">← Distributed Mesh</button>
+    <button class="page-nav-btn primary" data-goto="10">Lineage Viewer →</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════ PAGE 10 ════ -->
+<div class="page" id="page-10">
+  <div class="page-num">10 — Lineage Viewer</div>
+  <h1 class="page-title">Lineage <span class="accent">Viewer</span></h1>
+  <div class="page-divider"></div>
+
+  <p>The lineage viewer is a <strong>self-contained browser UI</strong> that renders the genome mutation tree in real time. It opens automatically when the hub starts.</p>
+
+  <div class="callout callout-tip"><strong>Access:</strong> <a href="http://localhost:8765/viewer" target="_blank">http://localhost:8765/viewer</a></div>
+
+  <h2>What It Shows</h2>
+  <div class="prop-grid">
+    <div class="prop-cell">
+      <div class="prop-cell-key">Genome Tree</div>
+      <div class="prop-cell-val">parent → child arrows showing which genome mutated into which</div>
+    </div>
+    <div class="prop-cell">
+      <div class="prop-cell-key">Fitness Bars</div>
+      <div class="prop-cell-val">Score for each genome version at the step it was promoted or rejected</div>
+    </div>
+    <div class="prop-cell">
+      <div class="prop-cell-key">TEE Badges</div>
+      <div class="prop-cell-val">Which evaluations were verified by the LLM judge with TEE attestation</div>
+    </div>
+    <div class="prop-cell">
+      <div class="prop-cell-key">Live Updates</div>
+      <div class="prop-cell-val">Polls /lineage every 3 seconds — no page refresh needed</div>
+    </div>
+  </div>
+
+  <h2>Lineage API</h2>
+<pre>curl http://localhost:8765/lineage
+
+[
+  {
+    <span class="s">"genome_id"</span>: <span class="s">"genome-v1"</span>,
+    <span class="s">"parent_id"</span>: <span class="k">null</span>,
+    <span class="s">"model"</span>: <span class="s">"qwen/qwen-2.5-7b-instruct"</span>,
+    <span class="s">"strategy"</span>: <span class="s">"plan-execute-reflect"</span>,
+    <span class="s">"fitness_score"</span>: <span class="n">0.85</span>,
+    <span class="s">"tee_verified"</span>: <span class="k">false</span>,
+    <span class="s">"timestamp"</span>: <span class="n">1746000000000</span>,
+    <span class="s">"step_count"</span>: <span class="n">1</span>
+  },
+  {
+    <span class="s">"genome_id"</span>: <span class="s">"genome-v2"</span>,
+    <span class="s">"parent_id"</span>: <span class="s">"genome-v1"</span>,
+    <span class="s">"model"</span>: <span class="s">"meta-llama/llama-3.1-8b-instruct"</span>,
+    <span class="s">"strategy"</span>: <span class="s">"plan-execute-reflect"</span>,
+    <span class="s">"fitness_score"</span>: <span class="n">0.42</span>,
+    <span class="s">"tee_verified"</span>: <span class="k">true</span>,
+    <span class="s">"timestamp"</span>: <span class="n">1746000010000</span>,
+    <span class="s">"step_count"</span>: <span class="n">2</span>
+  }
+]</pre>
+
+  <h2>Programmatic Lineage Access</h2>
+<pre><span class="t">import</span> { <span class="f">MeshHub</span> } <span class="t">from</span> <span class="s">'shingeki'</span>;
+
+<span class="k">const</span> hub = <span class="t">new</span> <span class="f">MeshHub</span>({ <span class="k">port</span>: <span class="n">8765</span> });
+<span class="k">await</span> hub.<span class="f">listen</span>();
+
+<span class="k">const</span> lineage = hub.<span class="f">getLineage</span>();
+lineage.<span class="f">forEach</span>(entry => {
+  console.<span class="f">log</span>(<span class="s">`${entry.genome_id} → score ${entry.fitness_score} (tee: ${entry.tee_verified})`</span>);
+});</pre>
+
+  <div class="page-nav">
+    <button class="page-nav-btn" data-goto="9">← AXL P2P Transport</button>
+    <button class="page-nav-btn primary" data-goto="11">Environment Variables →</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════ PAGE 11 ════ -->
+<div class="page" id="page-11">
+  <div class="page-num">11 — Environment Variables</div>
+  <h1 class="page-title">Environment <span class="accent">Variables</span></h1>
+  <div class="page-divider"></div>
+
+  <h2>Required</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Variable</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>ROUTER_API_KEY</code></td><td>Required. From <a href="https://pc.0g.ai" target="_blank">pc.0g.ai</a> → Dashboard → API Keys</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>0G On-Chain Verification</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Variable</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>PRIVATE_KEY</code></td><td>Wallet private key — enables 0G Log Store + KV uploads</td></tr>
+        <tr><td><code>BLOCKCHAIN_RPC</code></td><td>EVM RPC URL. Testnet: https://evmrpc-testnet.0g.ai</td></tr>
+        <tr><td><code>INDEXER_RPC</code></td><td>0G indexer URL. Testnet: https://indexer-storage-testnet-turbo.0g.ai</td></tr>
+        <tr><td><code>FLOW_CONTRACT</code></td><td>0G Flow contract. Testnet: 0x22e03a6a89b950f1c82ec5e74f8eca321a105296</td></tr>
+        <tr><td><code>KV_NODE_URL</code></td><td>0G KV node. Testnet: http://3.101.147.150:6789</td></tr>
+        <tr><td><code>ROUTER_BASE_URL</code></td><td>Override Router URL</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Genome / Evolution</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>SHINGEKI_EVOLVE_THRESHOLD</code></td><td>0.55</td><td>Fitness below this triggers genome mutation</td></tr>
+        <tr><td><code>SHINGEKI_AGENTMESH_CONFIG</code></td><td>agentmesh.example.yaml</td><td>Path to custom genome YAML config</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Hub</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>SHINGEKI_HUB_PORT</code></td><td>8765</td><td>Hub WebSocket + HTTP port</td></tr>
+        <tr><td><code>SHINGEKI_HUB_HOST</code></td><td>0.0.0.0</td><td>Hub bind address</td></tr>
+        <tr><td><code>SHINGEKI_HUB_TOKEN</code></td><td>—</td><td>Shared secret — required in production</td></tr>
+        <tr><td><code>SHINGEKI_HUB_STRICT_HTTP_AUTH</code></td><td>—</td><td>1 → enforce Bearer on all requests</td></tr>
+        <tr><td><code>SHINGEKI_HUB_TLS_CERT</code></td><td>—</td><td>Path to TLS certificate</td></tr>
+        <tr><td><code>SHINGEKI_HUB_TLS_KEY</code></td><td>—</td><td>Path to TLS key</td></tr>
+        <tr><td><code>SHINGEKI_HUB_READY_MIN_WORKERS</code></td><td>2</td><td>Min workers for /ready to return true</td></tr>
+        <tr><td><code>SHINGEKI_HUB_URL</code></td><td>ws://localhost:8765</td><td>Hub URL for workers and orchestrators</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Worker</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>NODE_ID</code></td><td>random UUID</td><td>Worker identity</td></tr>
+        <tr><td><code>NODE_ROLE</code></td><td>general</td><td>executor | critic | reasoning | memory | general</td></tr>
+        <tr><td><code>NODE_SPECIALIZATION</code></td><td>—</td><td>Comma-separated: research,planning,coding,defi</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Uniswap</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Variable</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>UNISWAP_API_KEY</code></td><td>From <a href="https://developers.uniswap.org/dashboard" target="_blank">developers.uniswap.org</a></td></tr>
+        <tr><td><code>AGENT_WALLET</code></td><td>Wallet address used as swapper in Uniswap quote requests</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>AXL P2P</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>AXL_ENABLED</code></td><td>false</td><td>true → use AXL P2P instead of WebSocket hub</td></tr>
+        <tr><td><code>AXL_API_URL</code></td><td>http://127.0.0.1:9002</td><td>AXL sidecar base URL</td></tr>
+        <tr><td><code>AXL_HUB_PEER_ID</code></td><td>—</td><td>Hub peer ID (workers need this)</td></tr>
+        <tr><td><code>AXL_WORKER_PEER_IDS</code></td><td>—</td><td>Comma-separated worker peer IDs</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Checkpoints &amp; Logging</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>SHINGEKI_CHECKPOINT_DIR</code></td><td>.checkpoints/</td><td>Directory for crash-recovery checkpoints</td></tr>
+        <tr><td><code>LOG_LEVEL</code></td><td>info</td><td>debug | info | warn | error</td></tr>
+        <tr><td><code>LOG_PRETTY</code></td><td>—</td><td>1 → human-readable logs instead of JSON lines</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="page-nav">
+    <button class="page-nav-btn" data-goto="10">← Lineage Viewer</button>
+    <button class="page-nav-btn primary" data-goto="12">Full API Reference →</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════ PAGE 12 ════ -->
+<div class="page" id="page-12">
+  <div class="page-num">12 — API Reference</div>
+  <h1 class="page-title">Full API <span class="accent">Reference</span></h1>
+  <div class="page-divider"></div>
+
+  <div class="callout callout-note">Install: <code>npm install shingeki</code> &nbsp;·&nbsp; <a href="https://www.npmjs.com/package/shingeki" target="_blank">npmjs.com/package/shingeki</a></div>
+
+  <h2>MeshOrchestrator</h2>
+<pre><span class="t">import</span> { <span class="f">MeshOrchestrator</span> } <span class="t">from</span> <span class="s">'shingeki'</span>;
+
+<span class="k">const</span> orch = <span class="t">new</span> <span class="f">MeshOrchestrator</span>(nodes);
+
+<span class="k">await</span> orch.<span class="f">executePlan</span>(plan, stepExecutor, options);
+<span class="c">// options.log             — (msg: string) => void</span>
+<span class="c">// options.onGenomeUpdate  — (genome: Genome) => void</span>
+<span class="c">// options.nextStepIndex   — resume from this step (default 0)</span>
+<span class="c">// options.priorResults    — prior results for resume</span></pre>
+
+  <h2>NodeRuntime</h2>
+<pre><span class="t">import</span> { <span class="f">NodeRuntime</span> } <span class="t">from</span> <span class="s">'shingeki'</span>;
+
+<span class="k">const</span> runtime = <span class="t">new</span> <span class="f">NodeRuntime</span>({ <span class="k">nodeId</span>: <span class="s">'node-1'</span> }, genome);
+<span class="k">const</span> result = <span class="k">await</span> runtime.<span class="f">executeStep</span>(step);
+<span class="c">// result.stepId     — string</span>
+<span class="c">// result.nodeId     — string</span>
+<span class="c">// result.output     — LLM response text (+ Uniswap quote if tool triggered)</span>
+<span class="c">// result.latencyMs  — number</span>
+<span class="c">// result.teeTrace   — 0G Router trace object</span>
+<span class="c">// result.evalResult — EvaluationResult after scoring</span></pre>
+
+  <h2>Genome Functions</h2>
+<pre><span class="t">import</span> { <span class="f">genomeFromConfig</span>, <span class="f">evaluateOutput</span>, <span class="f">heuristicScore</span>, <span class="f">applyMutation</span>, <span class="f">mutateGenome</span> } <span class="t">from</span> <span class="s">'shingeki'</span>;
+
+<span class="f">genomeFromConfig</span>(config, id?)       <span class="c">// AgentMeshConfig → Genome</span>
+<span class="f">evaluateOutput</span>(output, ctx?, thr?)  <span class="c">// string → Promise&lt;EvaluationResult&gt;</span>
+<span class="f">heuristicScore</span>(output)              <span class="c">// string → number (0–1), synchronous</span>
+<span class="f">applyMutation</span>(genome)               <span class="c">// Genome → Genome (one axis mutated)</span>
+<span class="f">mutateGenome</span>(genome)                <span class="c">// Genome → Genome[] (all 3 variants)</span></pre>
+
+  <h2>Coordination — WebSocket</h2>
+<pre><span class="t">import</span> {
+  <span class="f">MeshHub</span>, <span class="f">runWorkerHost</span>,
+  <span class="f">openOrchestratorSession</span>, <span class="f">createMeshStepExecutor</span>, <span class="f">hubUrlFromEnv</span>,
+} <span class="t">from</span> <span class="s">'shingeki'</span>;
+
+<span class="t">new</span> <span class="f">MeshHub</span>({ port, token?, tlsCert?, tlsKey? })
+hub.<span class="f">listen</span>()                     <span class="c">// → Promise&lt;void&gt;</span>
+hub.<span class="f">close</span>()
+hub.<span class="f">getLineage</span>()                 <span class="c">// → LineageEntry[]</span>
+
+<span class="f">runWorkerHost</span>({ hubUrl, token?, nodeId, role, specialization, genome })
+<span class="f">openOrchestratorSession</span>(url, token?)   <span class="c">// → Promise&lt;WebSocket&gt;</span>
+<span class="f">createMeshStepExecutor</span>(ws)             <span class="c">// → StepExecutor</span>
+<span class="f">hubUrlFromEnv</span>()                        <span class="c">// reads SHINGEKI_HUB_URL</span></pre>
+
+  <h2>Coordination — AXL P2P</h2>
+<pre><span class="t">import</span> {
+  <span class="f">createAxlTransport</span>, <span class="f">runAxlWorkerHost</span>,
+  <span class="f">runAxlOrchestratorSession</span>, <span class="f">createAxlStepExecutor</span>,
+} <span class="t">from</span> <span class="s">'shingeki'</span>;
+
+<span class="f">createAxlTransport</span>(apiUrl)
+axl.<span class="f">getIdentity</span>()                  <span class="c">// → Promise&lt;AxlIdentity&gt;</span>
+axl.<span class="f">send</span>(peerId, data)
+axl.<span class="f">recv</span>()                          <span class="c">// → Promise&lt;AxlMessage | null&gt;</span>
+axl.<span class="f">recvWait</span>(timeoutMs)             <span class="c">// → Promise&lt;AxlMessage&gt;</span>
+axl.<span class="f">isReady</span>()                       <span class="c">// → Promise&lt;boolean&gt;</span></pre>
+
+  <h2>Uniswap Tools</h2>
+<pre><span class="t">import</span> { <span class="f">getUniswapQuote</span>, <span class="f">buildUniswapSwap</span>, <span class="f">checkUniswapApproval</span> } <span class="t">from</span> <span class="s">'shingeki'</span>;
+
+<span class="f">getUniswapQuote</span>(params)                               <span class="c">// → Promise&lt;UniswapQuoteResult&gt;</span>
+<span class="f">buildUniswapSwap</span>(quote)                               <span class="c">// → Promise&lt;UniswapSwapTx&gt;</span>
+<span class="f">checkUniswapApproval</span>(token, amount, wallet, chainId)  <span class="c">// → Promise&lt;UniswapSwapTx | null&gt;</span></pre>
+
+  <h2>Plans / Presets</h2>
+<pre><span class="t">import</span> {
+  <span class="f">planResearchAnalyzeDecide</span>,  <span class="c">// 4-step research + recommendation pipeline</span>
+  <span class="f">planJapanTrip</span>,              <span class="c">// 6-step travel planner</span>
+  <span class="f">defiPlan</span>,                   <span class="c">// 4-step DeFi swap analysis</span>
+  <span class="f">splitCompoundTask</span>,          <span class="c">// infers steps + domains from free-form text</span>
+  <span class="f">planToRequiredRoles</span>,        <span class="c">// → NodeCapability[] (nodes the plan needs)</span>
+} <span class="t">from</span> <span class="s">'shingeki'</span>;</pre>
+
+  <h2>Infrastructure</h2>
+<pre><span class="t">import</span> {
+  <span class="f">writeCheckpointAtomic</span>, <span class="f">readCheckpoint</span>, <span class="f">listCheckpointSummaries</span>,
+  <span class="f">buildPriorContextFromResults</span>, <span class="f">createLogger</span>,
+} <span class="t">from</span> <span class="s">'shingeki'</span>;
+
+<span class="f">writeCheckpointAtomic</span>(dir, checkpoint)       <span class="c">// → Promise&lt;void&gt;</span>
+<span class="f">readCheckpoint</span>(dir, taskId)                  <span class="c">// → Promise&lt;DemoCheckpoint | null&gt;</span>
+<span class="f">listCheckpointSummaries</span>(dir)                 <span class="c">// → Promise&lt;CheckpointSummary[]&gt;</span>
+<span class="f">buildPriorContextFromResults</span>(steps, results) <span class="c">// → string</span>
+<span class="f">createLogger</span>(component)                      <span class="c">// → Logger</span></pre>
+
+  <h2>TypeScript Types</h2>
+<pre><span class="t">import type</span> {
+  Genome,               <span class="c">// { id, model, strategy, tools, reflection_depth, mutation_rate }</span>
+  AgentMeshConfig,      <span class="c">// shape of agentmesh.yaml</span>
+  Plan,                 <span class="c">// { taskId, steps }</span>
+  Step,                 <span class="c">// { id, description, domain?, role?, title? }</span>
+  StepResult,           <span class="c">// { stepId, nodeId, output, latencyMs, teeTrace?, evalResult? }</span>
+  EvaluationResult,     <span class="c">// { score, path, reason?, tee_verified? }</span>
+  LineageEntry,         <span class="c">// { genome_id, parent_id, model, strategy, fitness_score, ... }</span>
+  NodeCapability,       <span class="c">// { id, capabilities, specialization?, role? }</span>
+  NodeCapabilities,     <span class="c">// { role, latency_ms, cost_weight, specialization }</span>
+  MeshMessage,          <span class="c">// { type: CoordinationEventType, payload }</span>
+  UniswapQuoteParams,   <span class="c">// getUniswapQuote input</span>
+  UniswapQuoteResult,   <span class="c">// getUniswapQuote output</span>
+  UniswapSwapTx,        <span class="c">// { to, data, value, gasLimit }</span>
+  DemoCheckpoint,       <span class="c">// checkpoint file shape</span>
+  CheckpointSummary,    <span class="c">// list entry shape</span>
+} <span class="t">from</span> <span class="s">'shingeki'</span>;</pre>
+
+  <div class="page-nav">
+    <button class="page-nav-btn" data-goto="11">← Environment Variables</button>
+    <div></div>
+  </div>
+</div>
+
+</main>
+</div>
+
+<script>
+// ── PAGE NAVIGATION ──────────────────────────────────────────────────────
+(function() {
+  const pages = document.querySelectorAll('.page');
+  const sidebarItems = document.querySelectorAll('.sidebar-item[data-page]');
+
+  function goTo(n) {
+    const num = parseInt(n);
+    pages.forEach(p => p.classList.remove('active'));
+    sidebarItems.forEach(s => s.classList.remove('active'));
+
+    const page = document.getElementById('page-' + num);
+    if (page) {
+      page.classList.add('active');
+      page.scrollTop = 0;
+      document.querySelector('.main').scrollTop = 0;
+      window.scrollTo(0, 0);
+    }
+
+    sidebarItems.forEach(s => {
+      if (parseInt(s.dataset.page) === num) s.classList.add('active');
+    });
+
+    // update URL hash
+    history.replaceState(null, '', '#page-' + num);
+  }
+
+  // sidebar clicks
+  sidebarItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      goTo(item.dataset.page);
+    });
+  });
+
+  // page nav buttons
+  document.querySelectorAll('[data-goto]').forEach(btn => {
+    btn.addEventListener('click', () => goTo(btn.dataset.goto));
+  });
+
+  // restore from URL hash
+  const hash = window.location.hash;
+  if (hash && hash.startsWith('#page-')) {
+    goTo(hash.replace('#page-', ''));
+  }
+})();
+
+// ── SEARCH ───────────────────────────────────────────────────────────────
+(function() {
+  const input = document.getElementById('search-input');
+  const items = document.querySelectorAll('.sidebar-item[data-page]');
+
+  const pageTexts = {};
+  document.querySelectorAll('.page').forEach(p => {
+    pageTexts[p.id.replace('page-', '')] = p.textContent.toLowerCase();
+  });
+
+  input.addEventListener('input', () => {
+    const q = input.value.toLowerCase().trim();
+    if (!q) {
+      items.forEach(i => i.style.display = '');
+      return;
+    }
+    items.forEach(item => {
+      const num = item.dataset.page;
+      const matches = pageTexts[num] && pageTexts[num].includes(q);
+      item.style.display = matches ? '' : 'none';
+    });
+  });
+})();
+</script>
+
+</body>
+</html>

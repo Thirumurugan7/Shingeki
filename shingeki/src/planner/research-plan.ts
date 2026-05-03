@@ -80,6 +80,44 @@ export function planResearchAnalyzeDecide(taskId: string): Plan & { labels: stri
   };
 }
 
+export const DEFI_SWAP_GOAL = `
+Research ETH market conditions, get a Uniswap quote for swapping 0.01 ETH → USDC,
+and recommend whether to execute the swap with reasoning.
+`.trim();
+
+/** 3-step DeFi research + quote + decision pipeline. */
+export function defiPlan(taskId: string): Plan & { labels: string[] } {
+  const agentWallet =
+    process.env.AGENT_WALLET?.trim() ||
+    '0x0000000000000000000000000000000000000001';
+
+  const steps = [
+    step(
+      'defi-research',
+      'Market research',
+      'executor',
+      'research',
+      'Research current ETH price and whether it is a good time to swap 0.01 ETH for USDC based on market conditions. Consider recent price action, gas fees, and general market sentiment.',
+    ),
+    step(
+      'defi-quote',
+      'Get Uniswap quote',
+      'executor',
+      'defi',
+      `Get a Uniswap quote for swapping 10000000000000000 wei (0.01 ETH) to USDC (0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48) on chain 1. Swapper address: ${agentWallet}. Output the full quote details including route, price impact, and gas fee.`,
+    ),
+    step(
+      'defi-decide',
+      'Recommend',
+      'critic',
+      'planning',
+      'Given the market research and the Uniswap quote from PREVIOUS OUTPUT, recommend whether to execute the swap and explain why. Be decisive; include price impact, gas cost, and market timing in your reasoning.',
+    ),
+  ];
+
+  return { taskId, steps, labels: steps.map(s => s.title!) };
+}
+
 /** Longer multi-step trip planning chain (5 steps). */
 export function planJapanTrip(taskId: string): Plan & { labels: string[] } {
   const steps = [

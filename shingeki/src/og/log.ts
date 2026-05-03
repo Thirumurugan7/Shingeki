@@ -30,7 +30,7 @@ export async function appendTrace(
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
-/** Bounded retries for flaky storage sync / network blips during demos */
+/** Bounded retries for flaky storage sync / network blips */
 export async function appendTraceWithRetry(
   indexerRpc: string,
   rpcUrl: string,

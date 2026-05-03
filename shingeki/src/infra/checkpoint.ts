@@ -1,6 +1,7 @@
 /** Local durable checkpoints — survive hub/orchestrator crashes between steps (not mid-step). */
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Genome } from '../genome/schema.js';
 import type { StepResult } from '../types.js';
 
@@ -24,6 +25,45 @@ export function defaultCheckpointDir(shingekiRoot: string): string {
   const raw = process.env.SHINGEKI_CHECKPOINT_DIR?.trim();
   if (raw) return path.resolve(raw);
   return path.join(shingekiRoot, '.checkpoints');
+}
+
+/** Resolved `.checkpoints` dir for this package (hub + CLI). */
+export function resolvedCheckpointDir(): string {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  // src/infra → package root (matches cli.ts `shingekiRoot`)
+  const shingekiRoot = path.resolve(here, '..', '..');
+  return defaultCheckpointDir(shingekiRoot);
+}
+
+export interface CheckpointSummary {
+  taskId: string;
+  updatedAt: number;
+  stepCount: number;
+  nextStepIndex: number;
+  mesh: boolean;
+  summaryPreview: string;
+}
+
+export function listCheckpointSummaries(dir: string): CheckpointSummary[] {
+  if (!fs.existsSync(dir)) return [];
+  const names = fs
+    .readdirSync(dir)
+    .filter(f => f.endsWith('.json'))
+    .map(f => f.slice(0, -'.json'.length));
+  const out: CheckpointSummary[] = [];
+  for (const base of names) {
+    const cp = readCheckpoint(dir, base);
+    if (!cp) continue;
+    out.push({
+      taskId: cp.taskId,
+      updatedAt: cp.updatedAt,
+      stepCount: cp.results.length,
+      nextStepIndex: cp.nextStepIndex,
+      mesh: cp.mesh,
+      summaryPreview: cp.summary.replace(/\s+/g, ' ').trim().slice(0, 220),
+    });
+  }
+  return out.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export function checkpointPath(dir: string, taskId: string): string {

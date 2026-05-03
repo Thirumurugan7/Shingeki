@@ -1,6 +1,6 @@
 /**
  * In-process lineage store — records genome mutations chronologically.
- * In local (single-process) demo mode, the orchestrator writes here directly.
+ * In local (single-process) runs, the orchestrator writes here directly.
  * In mesh mode, the hub receives GENOME_LINEAGE WS messages and writes here.
  */
 import type { LineageEntry } from '../types.js';

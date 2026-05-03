@@ -1,6 +1,6 @@
 import type { Plan, Step } from '../types.js';
 
-/** Default demo goal: forces multi-step reasoning + multi-node routing + verification story. */
+/** Default preset goal (gpu): multi-step reasoning + multi-node routing + verification story. */
 export const GPU_LLM_RESEARCH_GOAL = `
 Find the best GPU under $1000 for running local LLMs in 2026,
 compare at least 3 options, and give a final recommendation with reasoning.

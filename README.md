@@ -28,19 +28,20 @@ variant, coordinated through 0G Storage, evolving autonomously over time.
 npx shingeki init
 ```
 
-### Runnable mesh demo (`shingeki/`)
+### Runnable mesh (`shingeki/`)
 
 ```bash
-cd shingeki && npm install && npm run demo
+cd shingeki && npm install && npm run run
 # parallel step-1 competition + live genome scoring/mutation + [Verification] / 0G traces
+# (`npm run demo` still works — alias for `run`)
 
 npm run hub
 NODE_ID=node-1 npm run node   # terminal
 NODE_ID=node-2 npm run node   # terminal
-npm run demo -- --mesh
+npm run run -- --mesh
 ```
 
-Env: `ROUTER_*`, optional `PRIVATE_KEY` for on-chain log/KV; `SHINGEKI_EVOLVE_THRESHOLD` (default `0.55`). For mesh, set the same `SHINGEKI_HUB_TOKEN` on hub, workers, and `demo --mesh` (required when `NODE_ENV` or `SHINGEKI_ENV` is `production`). The hub serves `GET /health`, `/ready`, Prometheus **`/metrics`**, and JSON **`/status`** on `SHINGEKI_HUB_PORT` (WebSocket upgrade on `/`). Optional TLS: set `SHINGEKI_HUB_TLS_CERT` + `SHINGEKI_HUB_TLS_KEY`. Crash recovery: each demo step writes **`shingeki/.checkpoints/<task>.json`** — resume with `demo --resume <task-id>` (same `--preset` / `--mesh` as before).
+Env: `ROUTER_*`, optional `PRIVATE_KEY` for on-chain log/KV; `SHINGEKI_EVOLVE_THRESHOLD` (default `0.55`). For mesh, set the same `SHINGEKI_HUB_TOKEN` on hub, workers, and **`run --mesh`** (required when `NODE_ENV` or `SHINGEKI_ENV` is `production`). The hub serves `GET /health`, `/ready`, Prometheus **`/metrics`**, and JSON **`/status`** on `SHINGEKI_HUB_PORT` (WebSocket upgrade on `/`). Optional TLS: set `SHINGEKI_HUB_TLS_CERT` + `SHINGEKI_HUB_TLS_KEY`. Crash recovery: each step writes **`shingeki/.checkpoints/<task>.json`** — resume with **`run --resume <task-id>`** (same `--preset` / `--mesh` as before).
 
 ## Architecture
 

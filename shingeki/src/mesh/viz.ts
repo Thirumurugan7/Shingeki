@@ -1,6 +1,6 @@
 import type { NodeCapability } from '../types.js';
 
-/** ASCII mesh status — makes “network of agents” visible in terminal demos. */
+/** ASCII mesh status — makes “network of agents” visible in the terminal. */
 export function formatMeshViz(nodes: NodeCapability[], activeIds: ReadonlySet<string>): string {
   const lines = ['[Mesh]'];
   for (const n of nodes) {

@@ -42,11 +42,13 @@ npm install
 ### Local mode (2 in-process nodes)
 
 ```bash
-npm run demo
+npm run run
 # Japan trip preset:
-npm run demo -- --preset japan
+npm run run -- --preset japan
 # Resume after crash:
-npm run demo -- --resume task-1746000000000
+npm run run -- --resume task-1746000000000
+# Legacy alias (same as run):
+# npm run demo
 ```
 
 ### Distributed mesh mode (4 terminals)
@@ -62,7 +64,7 @@ NODE_ID=node-1 NODE_ROLE=executor NODE_SPECIALIZATION=research npm run node
 NODE_ID=node-2 NODE_ROLE=reasoning NODE_SPECIALIZATION=planning npm run node
 
 # Terminal 4 — orchestrator
-npm run demo -- --mesh
+npm run run -- --mesh
 ```
 
 ### Lineage viewer
@@ -95,7 +97,7 @@ shingeki/src/
 │   ├── mesh-orchestrator-ws.ts  Orchestrator WS client + step executor
 │   └── protocol.ts         Message encode/parse + NodeCapabilities type
 ├── planner/
-│   └── research-plan.ts    GPU research plan + Japan trip plan (demo presets, domain-tagged steps)
+│   └── research-plan.ts    GPU research plan + Japan trip plan (built-in presets, domain-tagged steps)
 ├── infra/
 │   ├── checkpoint.ts       Atomic crash-recovery checkpoints
 │   ├── lineage-store.ts    In-process genome lineage store
@@ -103,9 +105,9 @@ shingeki/src/
 ├── config/
 │   ├── runtime-config.ts   All env vars with bounds validation
 │   └── env-check.ts        Pre-flight env check (fails fast before expensive ops)
-├── mesh/viz.ts             ASCII mesh status for terminal demos
+├── mesh/viz.ts             ASCII mesh status in the terminal
 ├── viewer/index.html       Self-contained genome lineage browser viewer
-└── cli.ts                  CLI: demo | hub | node
+└── cli.ts                  CLI: run | hub | node (`demo` aliases `run`)
 ```
 
 ---

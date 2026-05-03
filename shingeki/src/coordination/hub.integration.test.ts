@@ -1,12 +1,17 @@
 /**
  * Real TCP / HTTP stack — no mocks (integration-lite).
  */
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import WebSocket from 'ws';
 import { MeshHub } from './ws-hub.js';
 import { encodeMessage } from './protocol.js';
 import { addLineageEntry, clearLineage } from '../infra/lineage-store.js';
+import { CHECKPOINT_VERSION, writeCheckpointAtomic } from '../infra/checkpoint.js';
+import type { DemoCheckpoint } from '../infra/checkpoint.js';
 
 beforeEach(() => clearLineage());
 
@@ -171,6 +176,138 @@ test('GENOME_LINEAGE WS message is stored in lineage', async () => {
 
     ws.close();
     await new Promise<void>(r => setTimeout(r, 20));
+  } finally {
+    await close();
+  }
+});
+
+test('GET /checkpoints and GET /checkpoint read SHINGEKI_CHECKPOINT_DIR', async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shingeki-cp-'));
+  const prev = process.env.SHINGEKI_CHECKPOINT_DIR;
+  process.env.SHINGEKI_CHECKPOINT_DIR = dir;
+  t.after(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+    if (prev === undefined) delete process.env.SHINGEKI_CHECKPOINT_DIR;
+    else process.env.SHINGEKI_CHECKPOINT_DIR = prev;
+  });
+
+  const cp: DemoCheckpoint = {
+    version: CHECKPOINT_VERSION,
+    taskId: 'integration-task',
+    preset: 'gpu',
+    mesh: false,
+    nextStepIndex: 1,
+    results: [{ stepId: 'step-a', nodeId: 'n1', output: 'step output', latencyMs: 12 }],
+    genome: {
+      id: 'g1',
+      model: 'm',
+      strategy: 'plan',
+      tools: [],
+      reflection_depth: 1,
+      mutation_rate: 0.1,
+    },
+    evolveThreshold: 0.5,
+    summary: 'final summary',
+    updatedAt: 4242,
+  };
+  writeCheckpointAtomic(dir, cp);
+
+  const hub = new MeshHub({ port: 0 });
+  const { httpServer, close } = await hub.listen();
+  try {
+    const addr = httpServer.address();
+    assert.ok(addr && typeof addr === 'object');
+    const port = addr.port;
+
+    const list = await fetch(`http://127.0.0.1:${port}/checkpoints`);
+    assert.equal(list.status, 200);
+    const lj = (await list.json()) as {
+      dir: string;
+      checkpoints: Array<{ taskId: string; summaryPreview: string }>;
+    };
+    assert.equal(lj.dir, path.resolve(dir));
+    assert.equal(lj.checkpoints.length, 1);
+    assert.equal(lj.checkpoints[0]!.taskId, 'integration-task');
+
+    const one = await fetch(
+      `http://127.0.0.1:${port}/checkpoint?task=${encodeURIComponent('integration-task')}`,
+    );
+    assert.equal(one.status, 200);
+    const cj = (await one.json()) as DemoCheckpoint;
+    assert.equal(cj.taskId, 'integration-task');
+    assert.equal(cj.summary, 'final summary');
+    assert.equal(cj.results.length, 1);
+    assert.equal(cj.results[0]!.output, 'step output');
+
+    const missing = await fetch(`http://127.0.0.1:${port}/checkpoint?task=nope`);
+    assert.equal(missing.status, 404);
+  } finally {
+    await close();
+  }
+});
+
+test('OPTIONS /api/run CORS preflight', async () => {
+  const hub = new MeshHub({ port: 0 });
+  const { httpServer, close } = await hub.listen();
+  try {
+    const addr = httpServer.address();
+    assert.ok(addr && typeof addr === 'object');
+    const port = addr.port;
+    const res = await fetch(`http://127.0.0.1:${port}/api/run`, { method: 'OPTIONS' });
+    assert.equal(res.status, 204);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/run returns 401 when hub token is required (strict HTTP auth)', async t => {
+  const prevStrict = process.env.SHINGEKI_HUB_STRICT_HTTP_AUTH;
+  process.env.SHINGEKI_HUB_STRICT_HTTP_AUTH = '1';
+  t.after(() => {
+    if (prevStrict === undefined) delete process.env.SHINGEKI_HUB_STRICT_HTTP_AUTH;
+    else process.env.SHINGEKI_HUB_STRICT_HTTP_AUTH = prevStrict;
+  });
+
+  const hub = new MeshHub({ port: 0, authToken: 'hub-secret' });
+  const { httpServer, close } = await hub.listen();
+  try {
+    const addr = httpServer.address();
+    assert.ok(addr && typeof addr === 'object');
+    const port = addr.port;
+    const res = await fetch(`http://127.0.0.1:${port}/api/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ preset: 'gpu' }),
+    });
+    assert.equal(res.status, 401);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/run returns 400 env when ROUTER_API_KEY missing', async t => {
+  const prev = process.env.ROUTER_API_KEY;
+  delete process.env.ROUTER_API_KEY;
+  t.after(() => {
+    if (prev !== undefined) process.env.ROUTER_API_KEY = prev;
+    else delete process.env.ROUTER_API_KEY;
+  });
+
+  const hub = new MeshHub({ port: 0 });
+  const { httpServer, close } = await hub.listen();
+  try {
+    const addr = httpServer.address();
+    assert.ok(addr && typeof addr === 'object');
+    const port = addr.port;
+    const res = await fetch(`http://127.0.0.1:${port}/api/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ preset: 'gpu' }),
+    });
+    assert.equal(res.status, 400);
+    const j = (await res.json()) as { error: string; errors?: string[] };
+    assert.equal(j.error, 'env');
+    assert.ok(Array.isArray(j.errors));
   } finally {
     await close();
   }

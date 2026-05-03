@@ -1,5 +1,5 @@
 /**
- * Fail fast for demo commands — never log secret values.
+ * Fail fast before `run` — never log secret values.
  */
 
 export interface EnvCheckResult {
@@ -8,7 +8,7 @@ export interface EnvCheckResult {
   warnings: string[];
 }
 
-export function checkDemoEnv(): EnvCheckResult {
+export function checkRunEnv(): EnvCheckResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 

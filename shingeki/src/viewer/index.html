@@ -3,49 +3,230 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>進撃 Shingeki — Genome Lineage</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <title>進撃 Shingeki — Hub viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Serif+JP:wght@600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0d0d0f;
-      --surface: #18181b;
-      --border: #27272a;
-      --text: #e4e4e7;
-      --muted: #71717a;
-      --accent: #6366f1;
-      --green: #22c55e;
-      --yellow: #eab308;
-      --red: #ef4444;
+      --bg-deep: #060608;
+      --bg: #0c0c10;
+      --surface: #12121a;
+      --surface-hover: #181822;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.14);
+      --text: #f4f3f0;
+      --muted: #8b8b9a;
+      --accent: #e24a3b;
+      --accent-glow: rgba(226, 74, 59, 0.35);
+      --accent-soft: rgba(226, 74, 59, 0.12);
+      --green: #34d399;
+      --green-dim: rgba(52, 211, 153, 0.15);
+      --yellow: #fbbf24;
+      --red: #f87171;
+      --radius: 14px;
+      --radius-sm: 10px;
+      --font-sans: 'Outfit', system-ui, sans-serif;
+      --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+      --font-jp: 'Noto Serif JP', serif;
     }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: 'Inter', system-ui, sans-serif;
-      background: var(--bg);
+      font-family: var(--font-sans);
+      background: var(--bg-deep);
       color: var(--text);
       min-height: 100vh;
-      padding: 2rem;
+      line-height: 1.5;
     }
-    header {
+
+    /* Atmospheric background */
+    .bg-layer {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background:
+        radial-gradient(ellipse 120% 80% at 100% -20%, rgba(226, 74, 59, 0.09), transparent 50%),
+        radial-gradient(ellipse 80% 60% at -10% 100%, rgba(80, 60, 120, 0.06), transparent 45%),
+        linear-gradient(180deg, var(--bg-deep) 0%, var(--bg) 40%, #08080c 100%);
+    }
+    .bg-grid {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(ellipse 70% 70% at 50% 30%, black 20%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .app-shell {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: clamp(1.25rem, 4vw, 2.5rem);
+      padding-bottom: 4rem;
+    }
+
+    header.site-header {
       display: flex;
-      align-items: center;
-      gap: 1rem;
-      margin-bottom: 2.5rem;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 1rem 1.5rem;
+      margin-bottom: 2rem;
+      padding-bottom: 1.75rem;
       border-bottom: 1px solid var(--border);
-      padding-bottom: 1.25rem;
+      position: relative;
     }
-    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.03em; }
-    .subtitle { color: var(--muted); font-size: 0.875rem; }
+    header.site-header::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      width: min(180px, 40%);
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), transparent);
+      border-radius: 2px;
+    }
+
+    .brand {
+      flex: 1;
+      min-width: min(100%, 280px);
+    }
+    .brand-title {
+      display: flex;
+      align-items: baseline;
+      gap: 0.65rem;
+      flex-wrap: wrap;
+    }
+    .brand-title .jp {
+      font-family: var(--font-jp);
+      font-size: clamp(1.75rem, 4vw, 2.15rem);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      background: linear-gradient(135deg, #fff 0%, #c8c8d0 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .brand-title .en {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .subtitle {
+      margin-top: 0.35rem;
+      font-size: 0.88rem;
+      color: var(--muted);
+      font-weight: 400;
+    }
+
     #status {
-      margin-left: auto;
-      font-size: 0.75rem;
-      padding: 0.25rem 0.75rem;
-      border-radius: 9999px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      padding: 0.4rem 0.9rem;
+      border-radius: 999px;
+      border: 1px solid var(--border-strong);
       background: var(--surface);
-      border: 1px solid var(--border);
-      transition: color 0.3s, border-color 0.3s;
+      color: var(--muted);
+      transition: border-color 0.25s, color 0.25s, box-shadow 0.25s;
+      white-space: nowrap;
     }
-    #status.ok  { color: var(--green);  border-color: var(--green); }
-    #status.err { color: var(--red);    border-color: var(--red); }
+    #status.ok {
+      color: var(--green);
+      border-color: rgba(52, 211, 153, 0.35);
+      box-shadow: 0 0 20px var(--green-dim);
+      animation: pulse-soft 3s ease-in-out infinite;
+    }
+    #status.err {
+      color: var(--red);
+      border-color: rgba(248, 113, 113, 0.4);
+      animation: none;
+    }
+    @keyframes pulse-soft {
+      0%, 100% { box-shadow: 0 0 12px var(--green-dim); }
+      50% { box-shadow: 0 0 22px rgba(52, 211, 153, 0.22); }
+    }
+
+    /* Tab bar */
+    .tab-bar-wrap {
+      margin-bottom: 2rem;
+    }
+    .tab-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding: 0.35rem;
+      border-radius: calc(var(--radius) + 4px);
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+    .tab {
+      font-family: inherit;
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      padding: 0.55rem 1.15rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: color 0.2s, background 0.2s, border-color 0.2s, transform 0.15s;
+    }
+    .tab:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .tab:active {
+      transform: scale(0.98);
+    }
+    .tab:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .tab.active {
+      color: var(--text);
+      background: linear-gradient(165deg, rgba(226, 74, 59, 0.18) 0%, rgba(24, 24, 34, 0.95) 100%);
+      border-color: rgba(226, 74, 59, 0.45);
+      box-shadow: 0 0 24px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    main { min-height: 42vh; }
+
+    .panel {
+      display: none;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.35s cubic-bezier(0.22, 1, 0.36, 1), transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .panel.visible {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .panel-inner {
+      animation: panel-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    @keyframes panel-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     #tree {
       display: flex;
       flex-direction: column;
@@ -53,15 +234,25 @@
       max-width: 680px;
       margin: 0 auto;
     }
+
     .card {
       width: 100%;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.25rem 1.5rem;
-      transition: border-color 0.25s;
+      border-radius: var(--radius);
+      padding: 1.35rem 1.5rem;
+      transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
     }
-    .card.latest { border-color: var(--accent); box-shadow: 0 0 0 1px #6366f118; }
+    .card:hover {
+      border-color: var(--border-strong);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    }
+    .card.latest {
+      border-color: rgba(226, 74, 59, 0.5);
+      box-shadow: 0 0 0 1px var(--accent-soft), 0 8px 32px var(--accent-glow);
+    }
     .card-header {
       display: flex;
       align-items: center;
@@ -70,26 +261,30 @@
       flex-wrap: wrap;
     }
     .genome-id {
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       font-weight: 600;
-      font-family: 'Courier New', monospace;
+      font-family: var(--font-mono);
+      letter-spacing: -0.02em;
     }
     .badge {
-      font-size: 0.68rem;
-      padding: 0.18rem 0.55rem;
+      font-size: 0.62rem;
+      padding: 0.22rem 0.55rem;
       border-radius: 6px;
-      font-weight: 600;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
     }
-    .badge-tee    { background: #16a34a1a; color: var(--green);  border: 1px solid #16a34a55; }
-    .badge-latest { background: #6366f11a; color: var(--accent); border: 1px solid #6366f155; }
-    .badge-mutated{ background: #eab3081a; color: var(--yellow); border: 1px solid #eab30855; }
-    .badge-origin { background: #27272a;   color: var(--muted);  border: 1px solid var(--border); }
+    .badge-tee    { background: rgba(52, 211, 153, 0.12); color: var(--green); border: 1px solid rgba(52, 211, 153, 0.35); }
+    .badge-latest { background: var(--accent-soft); color: #ff9a8e; border: 1px solid rgba(226, 74, 59, 0.35); }
+    .badge-mutated{ background: rgba(251, 191, 36, 0.1); color: var(--yellow); border: 1px solid rgba(251, 191, 36, 0.35); }
+    .badge-origin { background: rgba(255,255,255,0.04); color: var(--muted); border: 1px solid var(--border); }
+
     .meta {
-      font-size: 0.76rem;
+      font-size: 0.74rem;
       color: var(--muted);
       display: flex;
       gap: 1.25rem;
-      margin-bottom: 0.875rem;
+      margin-bottom: 1rem;
       flex-wrap: wrap;
     }
     .score-row {
@@ -97,43 +292,645 @@
       align-items: center;
       gap: 0.75rem;
     }
-    .score-label { font-size: 0.75rem; color: var(--muted); min-width: 3.5rem; }
+    .score-label { font-size: 0.72rem; color: var(--muted); min-width: 3.5rem; font-weight: 500; }
     .score-bar {
       flex: 1;
-      height: 5px;
-      background: var(--border);
-      border-radius: 3px;
+      height: 6px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 6px;
       overflow: hidden;
     }
-    .score-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
-    .score-val  { font-size: 0.75rem; font-weight: 600; min-width: 2.75rem; text-align: right; }
-    .connector  { width: 2px; height: 2rem; background: var(--border); }
+    .score-fill { height: 100%; border-radius: 6px; transition: width 0.65s cubic-bezier(0.22, 1, 0.36, 1); }
+    .score-val  { font-size: 0.75rem; font-weight: 700; font-family: var(--font-mono); min-width: 2.75rem; text-align: right; }
+
+    .connector {
+      width: 2px;
+      height: 2rem;
+      background: linear-gradient(180deg, rgba(226, 74, 59, 0.5), rgba(255,255,255,0.08));
+      border-radius: 2px;
+    }
+
     .empty {
       color: var(--muted);
       text-align: center;
-      padding: 5rem 0;
+      padding: clamp(3rem, 12vw, 5rem) 1.5rem;
+      font-size: 0.92rem;
+      line-height: 1.85;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      background: rgba(0, 0, 0, 0.2);
+    }
+    .empty code {
+      font-family: var(--font-mono);
+      font-size: 0.82em;
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.06);
+    }
+
+    .task-wrap { max-width: 720px; margin: 0 auto; }
+
+    .task-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .task-toolbar label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    select.input,
+    .task-toolbar select {
+      flex: 1;
+      min-width: 12rem;
+      font-family: var(--font-sans);
+      font-size: 0.88rem;
+      padding: 0.65rem 0.9rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    select.input:focus-visible,
+    .task-toolbar select:focus-visible {
+      outline: none;
+      border-color: rgba(226, 74, 59, 0.55);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .task-meta {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 1.25rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem 1.5rem;
+      font-family: var(--font-mono);
+    }
+    .task-meta strong { color: var(--text); font-weight: 500; }
+
+    .task-summary {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.35rem 1.5rem;
+      margin-bottom: 1.5rem;
+      border-left: 3px solid rgba(226, 74, 59, 0.65);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+    }
+    /* Section chrome — only the “Final summary” label, not Markdown headings inside */
+    .task-summary > h2 {
+      font-family: var(--font-sans);
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+      margin: 0 0 1rem;
+      font-weight: 700;
+    }
+
+    /* Markdown / readme-style prose (summary + step outputs) */
+    .md-content {
+      font-size: 0.92rem;
+      line-height: 1.65;
+      color: var(--text);
+      word-break: break-word;
+      overflow-x: auto;
+    }
+    .md-content > *:first-child { margin-top: 0 !important; }
+    .md-content > *:last-child { margin-bottom: 0 !important; }
+    .md-content h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin: 1.15rem 0 0.55rem;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+      padding-bottom: 0.35rem;
+      border-bottom: 1px solid var(--border-strong);
+      color: var(--text);
+    }
+    .md-content h2 {
+      font-size: 1.12rem;
+      font-weight: 700;
+      margin: 1rem 0 0.45rem;
+      letter-spacing: -0.01em;
+      color: #eae9e6;
+    }
+    .md-content h3 {
+      font-size: 1rem;
+      font-weight: 650;
+      margin: 0.85rem 0 0.4rem;
+      color: #e8e7e4;
+    }
+    .md-content h4, .md-content h5, .md-content h6 {
+      font-size: 0.92rem;
+      font-weight: 600;
+      margin: 0.75rem 0 0.35rem;
+      color: var(--muted);
+    }
+    .md-content p { margin: 0.55rem 0; }
+    .md-content ul, .md-content ol {
+      margin: 0.55rem 0;
+      padding-left: 1.35rem;
+    }
+    .md-content li { margin: 0.25rem 0; }
+    .md-content li > p { margin: 0.2rem 0; }
+    .md-content blockquote {
+      margin: 0.75rem 0;
+      padding: 0.5rem 0 0.5rem 1rem;
+      border-left: 3px solid rgba(226, 74, 59, 0.55);
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      color: var(--muted);
+    }
+    .md-content blockquote p { margin: 0.35rem 0; }
+    .md-content hr {
+      border: none;
+      border-top: 1px solid var(--border-strong);
+      margin: 1.15rem 0;
+    }
+    .md-content a {
+      color: #ff8a7a;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .md-content a:hover { color: #ffb8ae; }
+    .md-content strong { font-weight: 700; color: var(--text); }
+    .md-content em { font-style: italic; color: #dddcd8; }
+    .md-content code {
+      font-family: var(--font-mono);
+      font-size: 0.84em;
+      padding: 0.15em 0.45em;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .md-content pre {
+      margin: 0.75rem 0;
+      padding: 1rem 1.1rem;
+      border-radius: var(--radius-sm);
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--border);
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      line-height: 1.55;
+      color: #d6d4ce;
+    }
+    .md-content pre code {
+      padding: 0;
+      border: none;
+      background: none;
+      font-size: inherit;
+    }
+    .md-content table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 0.75rem 0;
+      font-size: 0.86rem;
+    }
+    .md-content th, .md-content td {
+      border: 1px solid var(--border-strong);
+      padding: 0.5rem 0.65rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    .md-content th {
+      background: rgba(255, 255, 255, 0.05);
+      font-weight: 600;
+      color: var(--text);
+    }
+    .md-content tr:nth-child(even) td { background: rgba(0, 0, 0, 0.15); }
+    .md-fallback {
+      margin: 0;
+      padding: 1rem;
+      border-radius: var(--radius-sm);
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #d6d4ce;
+    }
+
+    .steps-label {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+      margin-bottom: 0.85rem;
+      font-weight: 700;
+    }
+
+    .step-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 1.1rem 1.25rem;
+      margin-bottom: 0.85rem;
+      transition: border-color 0.2s;
+    }
+    .step-card:hover {
+      border-color: var(--border-strong);
+    }
+    .step-card h3 {
+      font-size: 0.82rem;
+      font-weight: 600;
+      margin-bottom: 0.45rem;
+      font-family: var(--font-mono);
+      color: var(--text);
+    }
+    .step-card .sub {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 0.65rem;
+      font-family: var(--font-mono);
+    }
+    .step-card .step-output-md {
+      margin-top: 0.35rem;
+    }
+
+    .run-form { max-width: 640px; margin: 0 auto; }
+    .run-form .field { margin-bottom: 1.25rem; }
+    .run-form label {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.45rem;
+    }
+    .run-form textarea,
+    .run-form input[type="text"] {
+      width: 100%;
+      font-family: var(--font-sans);
       font-size: 0.9rem;
-      line-height: 1.8;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-strong);
+      background: rgba(0, 0, 0, 0.35);
+      color: var(--text);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .run-form textarea:focus-visible,
+    .run-form input[type="text"]:focus-visible {
+      outline: none;
+      border-color: rgba(226, 74, 59, 0.55);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    .run-form textarea { min-height: 8.5rem; resize: vertical; line-height: 1.55; }
+
+    .run-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.25rem;
+      align-items: flex-end;
+    }
+    .run-row label.inline {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      font-size: 0.88rem;
+      font-weight: 500;
+      text-transform: none;
+      letter-spacing: normal;
+      color: var(--text);
+      cursor: pointer;
+      padding: 0.5rem 0;
+    }
+    .run-row input[type="checkbox"] {
+      width: 1.05rem;
+      height: 1.05rem;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .run-form select {
+      font-family: var(--font-sans);
+      font-size: 0.88rem;
+      padding: 0.65rem 0.9rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      color: var(--text);
+      min-width: 10rem;
+      cursor: pointer;
+    }
+    #run-resume-select {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+    }
+
+    .run-form button.primary {
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      padding: 0.7rem 1.6rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(226, 74, 59, 0.6);
+      background: linear-gradient(180deg, #e85545 0%, #c73e32 50%, #a33228 100%);
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 4px 16px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.12);
+      transition: transform 0.15s, box-shadow 0.2s, filter 0.2s;
+    }
+    .run-form button.primary:hover {
+      filter: brightness(1.06);
+      box-shadow: 0 6px 28px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.15);
+    }
+    .run-form button.primary:active {
+      transform: translateY(1px);
+    }
+    .run-form button.primary:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+    .run-form button.primary:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+      filter: none;
+    }
+
+    .run-hint {
+      font-size: 0.78rem;
+      color: var(--muted);
+      line-height: 1.65;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+    .run-hint code {
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      padding: 0.12em 0.35em;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.06);
+    }
+
+    #run-feedback {
+      margin-bottom: 1.25rem;
+      padding: 0.85rem 1.1rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.88rem;
+      display: none;
+      line-height: 1.55;
+      animation: feedback-in 0.35s ease both;
+    }
+    @keyframes feedback-in {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: none; }
+    }
+    #run-feedback.visible { display: block; }
+    #run-feedback.ok {
+      border: 1px solid rgba(52, 211, 153, 0.35);
+      background: rgba(52, 211, 153, 0.08);
+      color: var(--green);
+    }
+    #run-feedback.err {
+      border: 1px solid rgba(248, 113, 113, 0.45);
+      background: rgba(248, 113, 113, 0.08);
+      color: #fecaca;
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>進撃 Shingeki</h1>
-    <span class="subtitle">Genome Lineage</span>
-    <span id="status">connecting…</span>
-  </header>
-  <main id="tree"></main>
+  <div class="bg-layer" aria-hidden="true"></div>
+  <div class="bg-grid" aria-hidden="true"></div>
 
+  <div class="app-shell">
+    <header class="site-header">
+      <div class="brand">
+        <div class="brand-title">
+          <span class="jp">進撃</span>
+          <span class="en">Shingeki</span>
+        </div>
+        <p class="subtitle">Genome lineage &amp; task checkpoints</p>
+      </div>
+      <span id="status">connecting…</span>
+    </header>
+
+    <div class="tab-bar-wrap">
+      <nav class="tab-bar" role="tablist" aria-label="Viewer sections">
+        <button type="button" class="tab active" id="tab-lineage" role="tab" aria-selected="true" aria-controls="panel-lineage">Genome lineage</button>
+        <button type="button" class="tab" id="tab-run" role="tab" aria-selected="false" aria-controls="panel-run">Run task</button>
+        <button type="button" class="tab" id="tab-tasks" role="tab" aria-selected="false" aria-controls="panel-tasks">Task results</button>
+      </nav>
+    </div>
+
+    <main>
+      <div id="panel-lineage" class="panel visible" role="tabpanel" aria-labelledby="tab-lineage">
+        <div class="panel-inner">
+          <div id="tree"></div>
+        </div>
+      </div>
+
+      <div id="panel-run" class="panel" role="tabpanel" aria-labelledby="tab-run" hidden>
+        <div class="panel-inner">
+          <div id="run-feedback" role="status"></div>
+          <form class="run-form" id="run-form" autocomplete="off">
+            <div class="field">
+              <label for="run-task-text">Task (optional — leave empty to use the preset goal)</label>
+              <textarea id="run-task-text" name="task" placeholder="Describe the task, or use semicolons to split steps…"></textarea>
+            </div>
+            <div class="field run-row">
+              <div>
+                <label for="run-preset">Preset</label>
+                <select id="run-preset" name="preset" class="input">
+                  <option value="gpu" selected>GPU research</option>
+                  <option value="japan">Japan trip</option>
+                </select>
+              </div>
+              <label class="inline"><input type="checkbox" id="run-mesh" name="mesh" /> Distributed mesh (needs workers on this hub)</label>
+            </div>
+            <div class="field">
+              <label for="run-resume-select">Resume from checkpoint (optional)</label>
+              <select id="run-resume-select" name="resume" class="input" aria-label="Resume from saved checkpoint">
+                <option value="">— New run —</option>
+              </select>
+            </div>
+            <button type="submit" class="primary" id="run-submit">Start run</button>
+            <p class="run-hint">Runs the same CLI as <code>npm run run</code> on the hub machine — Router / wallet keys stay in <code>.env</code> only. Mesh mode needs workers on this hub.</p>
+          </form>
+        </div>
+      </div>
+
+      <div id="panel-tasks" class="panel" role="tabpanel" aria-labelledby="tab-tasks" hidden>
+        <div class="panel-inner">
+          <div class="task-wrap">
+            <div class="task-toolbar">
+              <label for="task-select">Checkpoint</label>
+              <select id="task-select" class="input" aria-label="Select task checkpoint"></select>
+            </div>
+            <div id="task-body"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js" crossorigin="anonymous"></script>
   <script>
     const tree = document.getElementById('tree');
     const statusEl = document.getElementById('status');
-    let lastHash = '';
+    const tabLineage = document.getElementById('tab-lineage');
+    const tabRun = document.getElementById('tab-run');
+    const tabTasks = document.getElementById('tab-tasks');
+    const panelLineage = document.getElementById('panel-lineage');
+    const panelRun = document.getElementById('panel-run');
+    const panelTasks = document.getElementById('panel-tasks');
+    const taskSelect = document.getElementById('task-select');
+    const taskBody = document.getElementById('task-body');
+    const runForm = document.getElementById('run-form');
+    const runFeedback = document.getElementById('run-feedback');
+    const runSubmit = document.getElementById('run-submit');
+
+    let lastLineageHash = '';
+    let checkpointsCache = [];
+    let selectedTaskId = null;
+    let checkpointDetail = null;
+    /** Task id from last POST /api/run until it appears in /checkpoints (avoids dropping selection + confusing errors). */
+    let pendingRunTaskId = null;
+
+    tabLineage.addEventListener('click', () => setTab('lineage'));
+    tabRun.addEventListener('click', () => setTab('run'));
+    tabTasks.addEventListener('click', () => setTab('tasks'));
+
+    function setTab(which) {
+      const onLineage = which === 'lineage';
+      const onRun = which === 'run';
+      const onTasks = which === 'tasks';
+      tabLineage.classList.toggle('active', onLineage);
+      tabRun.classList.toggle('active', onRun);
+      tabTasks.classList.toggle('active', onTasks);
+      tabLineage.setAttribute('aria-selected', onLineage);
+      tabRun.setAttribute('aria-selected', onRun);
+      tabTasks.setAttribute('aria-selected', onTasks);
+      panelLineage.classList.toggle('visible', onLineage);
+      panelRun.classList.toggle('visible', onRun);
+      panelTasks.classList.toggle('visible', onTasks);
+      panelLineage.hidden = !onLineage;
+      panelRun.hidden = !onRun;
+      panelTasks.hidden = !onTasks;
+    }
+
+    function showRunFeedback(ok, text) {
+      runFeedback.textContent = text;
+      runFeedback.className = ok ? 'visible ok' : 'visible err';
+    }
+
+    function hideRunFeedback() {
+      runFeedback.className = '';
+      runFeedback.textContent = '';
+    }
+
+    runForm.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      hideRunFeedback();
+      const task = document.getElementById('run-task-text').value.trim();
+      const preset = document.getElementById('run-preset').value;
+      const mesh = document.getElementById('run-mesh').checked;
+      const resume = document.getElementById('run-resume-select').value.trim();
+      const headers = { 'Content-Type': 'application/json' };
+
+      const body = { preset, mesh };
+      if (task) body.task = task;
+      if (resume) body.resume = resume;
+
+      runSubmit.disabled = true;
+      try {
+        const res = await fetch('/api/run', { method: 'POST', headers, body: JSON.stringify(body) });
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 202 && data.accepted && data.taskId) {
+          pendingRunTaskId = data.taskId;
+          showRunFeedback(true, 'Run started — task id ' + data.taskId + '. Results appear in Task results after the first step completes.');
+          selectedTaskId = data.taskId;
+          setTab('tasks');
+          await poll();
+        } else if (res.status === 401) {
+          showRunFeedback(false, 'Unauthorized — hub requires SHINGEKI_HUB_TOKEN; open the viewer from this machine (localhost) or unset the token for local dev.');
+        } else if (res.status === 400 && data.error === 'env') {
+          showRunFeedback(false, (data.errors || []).join(' ') || 'Environment check failed (e.g. ROUTER_API_KEY).');
+        } else if (res.status === 404) {
+          showRunFeedback(
+            false,
+            data.task
+              ? 'Checkpoint not found yet — wait for the run to write its first step, then refresh.'
+              : 'Hub route not found — restart `npm run hub` from the shingeki folder (this hub must expose POST /api/run). Open the viewer from the same origin as the hub (e.g. http://127.0.0.1:8765/viewer).',
+          );
+        } else {
+          showRunFeedback(false, data.error || data.message || ('HTTP ' + res.status));
+        }
+      } catch (e) {
+        showRunFeedback(false, e.message || String(e));
+      } finally {
+        runSubmit.disabled = false;
+      }
+    });
+
+    taskSelect.addEventListener('change', async () => {
+      selectedTaskId = taskSelect.value || null;
+      await fetchCheckpointDetail();
+      renderTaskPanel();
+    });
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    (function initMarkdown() {
+      try {
+        if (typeof marked !== 'undefined' && marked.setOptions) {
+          marked.setOptions({
+            gfm: true,
+            breaks: true,
+          });
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+
+    /** Renders Markdown (readme-style) to safe HTML; falls back to escaped pre if libs missing. */
+    function renderMarkdown(src) {
+      const raw = String(src ?? '');
+      if (!raw.trim()) return '';
+      try {
+        if (
+          typeof marked !== 'undefined' &&
+          typeof marked.parse === 'function' &&
+          typeof DOMPurify !== 'undefined' &&
+          typeof DOMPurify.sanitize === 'function'
+        ) {
+          const html = marked.parse(raw, { async: false });
+          return DOMPurify.sanitize(html);
+        }
+      } catch (e) {
+        console.warn('[viewer] markdown render failed', e);
+      }
+      return `<pre class="md-fallback">${escapeHtml(raw)}</pre>`;
+    }
 
     function scoreColor(s) {
-      if (s >= 0.75) return '#22c55e';
-      if (s >= 0.55) return '#eab308';
-      return '#ef4444';
+      if (s >= 0.75) return '#34d399';
+      if (s >= 0.55) return '#fbbf24';
+      return '#f87171';
     }
 
     function fmtTime(ts) {
@@ -170,9 +967,9 @@
         </div>`;
     }
 
-    function render(entries) {
+    function renderLineage(entries) {
       if (!entries.length) {
-        tree.innerHTML = '<div class="empty">No genome mutations recorded yet.<br>Start <code>npm run demo -- --mesh</code> to see evolution in action.</div>';
+        tree.innerHTML = '<div class="empty">No genome mutations recorded yet.<br>Start <code>npm run run -- --mesh</code> to see evolution in action.</div>';
         return;
       }
       const parts = [];
@@ -183,14 +980,160 @@
       tree.innerHTML = parts.join('');
     }
 
+    function ensureTaskSelection() {
+      const ids = checkpointsCache.map(c => c.taskId);
+      if (pendingRunTaskId && ids.includes(pendingRunTaskId)) {
+        pendingRunTaskId = null;
+      }
+      if (!ids.length) {
+        selectedTaskId = pendingRunTaskId ?? null;
+        return;
+      }
+      if (pendingRunTaskId && !ids.includes(pendingRunTaskId)) {
+        selectedTaskId = pendingRunTaskId;
+        return;
+      }
+      if (!selectedTaskId || !ids.includes(selectedTaskId)) {
+        selectedTaskId = ids[0];
+      }
+    }
+
+    function fillTaskSelect() {
+      const cur = selectedTaskId;
+      taskSelect.innerHTML = '';
+      if (pendingRunTaskId && !checkpointsCache.some(c => c.taskId === pendingRunTaskId)) {
+        const opt = document.createElement('option');
+        opt.value = pendingRunTaskId;
+        opt.textContent = `${pendingRunTaskId} · starting…`;
+        taskSelect.appendChild(opt);
+      }
+      for (const c of checkpointsCache) {
+        const opt = document.createElement('option');
+        opt.value = c.taskId;
+        const t = new Date(c.updatedAt).toLocaleString(undefined, { hour12: false });
+        opt.textContent = `${c.taskId} · ${t} · ${c.stepCount} step(s)`;
+        taskSelect.appendChild(opt);
+      }
+      const valid =
+        cur &&
+        (checkpointsCache.some(x => x.taskId === cur) ||
+          (pendingRunTaskId && cur === pendingRunTaskId));
+      if (valid) {
+        taskSelect.value = cur;
+      } else if (selectedTaskId && checkpointsCache.some(x => x.taskId === selectedTaskId)) {
+        taskSelect.value = selectedTaskId;
+      }
+    }
+
+    function fillResumeSelect() {
+      const sel = document.getElementById('run-resume-select');
+      const prev = sel.value;
+      sel.innerHTML = '';
+      const opt0 = document.createElement('option');
+      opt0.value = '';
+      opt0.textContent = '— New run —';
+      sel.appendChild(opt0);
+      for (const c of checkpointsCache) {
+        const opt = document.createElement('option');
+        opt.value = c.taskId;
+        const t = new Date(c.updatedAt).toLocaleString(undefined, { hour12: false });
+        opt.textContent = `${c.taskId} · ${t} · ${c.stepCount} step(s)`;
+        sel.appendChild(opt);
+      }
+      if (prev && checkpointsCache.some(x => x.taskId === prev)) {
+        sel.value = prev;
+      } else {
+        sel.value = '';
+      }
+    }
+
+    async function fetchCheckpointDetail() {
+      if (!selectedTaskId) {
+        checkpointDetail = null;
+        return;
+      }
+      try {
+        const res = await fetch('/checkpoint?task=' + encodeURIComponent(selectedTaskId));
+        checkpointDetail = res.ok ? await res.json() : null;
+      } catch {
+        checkpointDetail = null;
+      }
+    }
+
+    function renderTaskPanel() {
+      if (!checkpointsCache.length) {
+        if (pendingRunTaskId) {
+          taskBody.innerHTML =
+            '<div class="empty"><strong>Run in progress.</strong><br>No checkpoint on disk yet — the first step must finish before results appear (often 30–120s). This view refreshes automatically.</div>';
+          return;
+        }
+        taskBody.innerHTML =
+          '<div class="empty">No checkpoint files yet.<br>Use the <strong>Run task</strong> tab, or <code>npm run run</code> on the same machine as this hub (<code>SHINGEKI_CHECKPOINT_DIR</code> → <code>shingeki/.checkpoints</code> by default).</div>';
+        return;
+      }
+      if (!checkpointDetail) {
+        const inList = selectedTaskId && checkpointsCache.some(c => c.taskId === selectedTaskId);
+        if (selectedTaskId && !inList) {
+          taskBody.innerHTML =
+            '<div class="empty"><strong>Waiting for checkpoint.</strong><br>Task <code>' +
+            escapeHtml(selectedTaskId) +
+            '</code> is starting — the hub will show output here once the first step completes.</div>';
+          return;
+        }
+        taskBody.innerHTML =
+          '<div class="empty">Could not load this checkpoint. Try another selection or wait and refresh.</div>';
+        return;
+      }
+      const cp = checkpointDetail;
+      const steps = (cp.results || []).map((r, i) => `
+        <div class="step-card">
+          <h3>${escapeHtml(r.stepId)}</h3>
+          <div class="sub">node ${escapeHtml(r.nodeId)} · ${r.latencyMs} ms</div>
+          <div class="md-content step-output-md">${renderMarkdown(r.output)}</div>
+        </div>
+      `).join('');
+      const summaryMd = renderMarkdown(cp.summary);
+      taskBody.innerHTML = `
+        <div class="task-meta">
+          <span>task: <strong>${escapeHtml(cp.taskId)}</strong></span>
+          <span>preset: ${escapeHtml(cp.preset)}</span>
+          <span>mesh: ${cp.mesh ? 'yes' : 'no'}</span>
+          <span>next step index: ${cp.nextStepIndex}</span>
+        </div>
+        <div class="task-summary">
+          <h2>Final summary</h2>
+          <div class="md-content">${summaryMd || '<p class="md-empty" style="color:var(--muted);margin:0">No summary yet.</p>'}</div>
+        </div>
+        ${steps ? `<div class="steps-label">Step outputs</div>${steps}` : '<div class="empty" style="padding:2rem 0">No step results in this checkpoint.</div>'}
+      `;
+    }
+
     async function poll() {
       try {
-        const res = await fetch('/lineage');
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        const hash = JSON.stringify(data);
-        if (hash !== lastHash) { lastHash = hash; render(data); }
-        statusEl.textContent = `live · ${data.length} genome${data.length !== 1 ? 's' : ''}`;
+        const [lr, cr] = await Promise.all([
+          fetch('/lineage'),
+          fetch('/checkpoints'),
+        ]);
+        if (!lr.ok) throw new Error(`lineage HTTP ${lr.status}`);
+        if (!cr.ok) throw new Error(`checkpoints HTTP ${cr.status}`);
+        const lineageData = await lr.json();
+        const cpPayload = await cr.json();
+        checkpointsCache = cpPayload.checkpoints || [];
+
+        const lineageHash = JSON.stringify(lineageData);
+        if (lineageHash !== lastLineageHash) {
+          lastLineageHash = lineageHash;
+          renderLineage(lineageData);
+        }
+
+        ensureTaskSelection();
+        fillTaskSelect();
+        fillResumeSelect();
+        await fetchCheckpointDetail();
+        renderTaskPanel();
+
+        statusEl.textContent =
+          `live · ${lineageData.length} genome${lineageData.length !== 1 ? 's' : ''} · ${checkpointsCache.length} checkpoint${checkpointsCache.length !== 1 ? 's' : ''}`;
         statusEl.className = 'ok';
       } catch (e) {
         statusEl.textContent = `error: ${e.message}`;

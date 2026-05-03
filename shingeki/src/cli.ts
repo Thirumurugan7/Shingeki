@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Shingeki CLI — demo [--mesh] [--preset gpu|japan] | hub | node
+ * Shingeki CLI — run [--mesh] [--preset gpu|japan] | hub | node   (alias: demo)
  */
 import { config } from 'dotenv';
 import path from 'node:path';
@@ -27,7 +27,7 @@ import {
 import { splitCompoundTask } from './orchestrator/planner.js';
 import { planToRequiredRoles } from './orchestrator/orchestrator.js';
 import { appendTraceWithRetry } from './og/log.js';
-import { checkDemoEnv, printEnvReport } from './config/env-check.js';
+import { checkRunEnv, printEnvReport } from './config/env-check.js';
 import {
   assertHubProductionSafe,
   assertMeshClientProductionSafe,
@@ -54,7 +54,7 @@ function loadAgentMesh(configPath: string): AgentMeshConfig {
   return parseYaml(raw) as AgentMeshConfig;
 }
 
-function parseDemoArgs(argv: string[]): {
+function parseRunArgs(argv: string[]): {
   mesh: boolean;
   preset: 'gpu' | 'japan';
   resumeTaskId?: string;
@@ -147,12 +147,12 @@ async function verifyStepOnChain(
   }
 }
 
-async function cmdDemo() {
+async function cmdRun() {
   const argv = process.argv.slice(3);
-  const { mesh, preset, resumeTaskId, taskIdArg, taskArg, rest } = parseDemoArgs(argv);
+  const { mesh, preset, resumeTaskId, taskIdArg, taskArg, rest } = parseRunArgs(argv);
   const taskOverride = rest.join(' ').trim();
 
-  const envReport = checkDemoEnv();
+  const envReport = checkRunEnv();
   printEnvReport(envReport, console.log);
   if (!envReport.ok) {
     console.error('\nFix .env (see repo .env.example) and retry.');
@@ -200,7 +200,7 @@ async function cmdDemo() {
     writeCheckpointAtomic(checkpointDir, payload);
   };
 
-  console.log('─── Shingeki demo ───');
+  console.log('─── Shingeki run ───');
   console.log('Goal:', summary.split('\n').map(l => l.trim()).join(' '));
   console.log('Preset:', preset, mesh ? '| mesh (hub + workers)' : '| local (in-process nodes)');
   console.log(`Evolution threshold (score < → mutate): ${evolveThreshold}`);
@@ -373,8 +373,10 @@ async function cmdHub() {
   const w = tls ? 'wss' : 'ws';
   const viewerUrl = `${h}://127.0.0.1:${port}/viewer`;
   console.log(`Shingeki hub listening on ${w}://127.0.0.1:${port}`);
-  console.log(`${h}://127.0.0.1:${port}/health   /ready   /metrics   /status   /lineage`);
-  console.log(`Genome lineage viewer: ${viewerUrl}`);
+  console.log(
+    `${h}://127.0.0.1:${port}/health   /ready   /metrics   /status   /lineage   /checkpoints   /checkpoint   POST /api/run`,
+  );
+  console.log(`Hub viewer (lineage + task checkpoints): ${viewerUrl}`);
   console.log(
     rawTok
       ? 'Hub auth: enabled — clients must set SHINGEKI_HUB_TOKEN (not logged)'
@@ -441,17 +443,18 @@ async function cmdNode() {
 }
 
 async function main() {
-  const cmd = process.argv[2] ?? 'demo';
-  if (cmd === 'demo') await cmdDemo();
+  const cmd = process.argv[2] ?? 'run';
+  if (cmd === 'run' || cmd === 'demo') await cmdRun();
   else if (cmd === 'hub') await cmdHub();
   else if (cmd === 'node') await cmdNode();
   else {
-    console.log(`Usage: node --import tsx src/cli.ts <demo|hub|node> [demo flags]`);
-    console.log(`  demo                         GPU research (parallel step 1 + evolution + 0G verification)`);
-    console.log(`  demo --preset japan          Japan trip planning`);
-    console.log(`  demo --mesh                  hub + workers (same + lineage viewer)`);
-    console.log(`  demo --resume task-…         continue after crash`);
-    console.log(`  demo --task "…"              free-form task (auto-splits, infers domains)`);
+    console.log(`Usage: node --import tsx src/cli.ts <run|hub|node> [flags]`);
+    console.log(`  run                          orchestrate task (parallel step 1 + evolution + 0G verification)`);
+    console.log(`  run --preset japan           structured Japan-trip preset`);
+    console.log(`  run --mesh                   distributed workers via hub (+ lineage viewer)`);
+    console.log(`  run --resume task-…          continue after crash (checkpoint)`);
+    console.log(`  run --task "…"               free-form task (semicolon-separated steps; infers domains)`);
+    console.log(`  demo                         alias for run (same behavior)`);
     console.log(`  hub                          start hub + open genome lineage viewer`);
     console.log(`  node                         start worker (NODE_ID, NODE_ROLE, NODE_SPECIALIZATION)`);
     process.exit(1);

@@ -392,8 +392,80 @@
       color: var(--text);
       cursor: pointer;
     }
-    .task-followup .primary { margin-top: 0.25rem; }
+    /* Follow-up button — identical treatment to .run-form button.primary */
+    .task-followup button.primary {
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      padding: 0.7rem 1.6rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(226, 74, 59, 0.6);
+      background: linear-gradient(180deg, #e85545 0%, #c73e32 50%, #a33228 100%);
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 4px 16px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.12);
+      transition: transform 0.15s, box-shadow 0.2s, filter 0.2s;
+      margin-top: 0.5rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .task-followup button.primary:hover {
+      filter: brightness(1.07);
+      box-shadow: 0 6px 28px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.15);
+    }
+    .task-followup button.primary:active { transform: translateY(1px); }
+    .task-followup button.primary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    .task-followup button.primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; filter: none; }
+
+    /* Also ensure run-form button uses inline-flex for spinner support */
+    .run-form button.primary { display: inline-flex; align-items: center; gap: 0.5rem; }
+
+    /* Button spinner */
+    @keyframes btn-spin { to { transform: rotate(360deg); } }
+    .btn-spinner {
+      width: 0.85em;
+      height: 0.85em;
+      border: 2px solid rgba(255,255,255,0.25);
+      border-top-color: rgba(255,255,255,0.9);
+      border-radius: 50%;
+      animation: btn-spin 0.65s linear infinite;
+      flex-shrink: 0;
+    }
+
+    /* Skeleton loader */
+    @keyframes shimmer {
+      0%   { background-position: -200% 0; }
+      100% { background-position:  200% 0; }
+    }
+    .skeleton-panel { padding: 0.25rem 0; }
+    .skel-line {
+      border-radius: 6px;
+      margin-bottom: 0.65rem;
+      background: linear-gradient(90deg,
+        rgba(255,255,255,0.04) 25%,
+        rgba(255,255,255,0.09) 50%,
+        rgba(255,255,255,0.04) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.6s ease-in-out infinite;
+    }
+    .skel-line.h1  { height: 1.6rem; width: 55%; margin-bottom: 1.1rem; }
+    .skel-line.h2  { height: 1.15rem; width: 38%; margin-bottom: 0.85rem; }
+    .skel-line.p   { height: 0.85rem; }
+    .skel-line.p.w100 { width: 100%; }
+    .skel-line.p.w85  { width: 85%; }
+    .skel-line.p.w70  { width: 70%; }
+    .skel-line.p.w50  { width: 50%; }
+    .skel-block {
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      padding: 1.1rem 1.25rem;
+      margin-bottom: 0.85rem;
+    }
+
     #followup-feedback {
+      margin-top: 0.35rem;
       margin-bottom: 1rem;
       padding: 0.75rem 1rem;
       border-radius: var(--radius-sm);
@@ -786,6 +858,129 @@
       background: rgba(248, 113, 113, 0.08);
       color: #fecaca;
     }
+
+    /* ── Tab badge ── */
+    .tab-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.35em;
+      height: 1.35em;
+      padding: 0 0.35em;
+      border-radius: 999px;
+      background: rgba(226, 74, 59, 0.22);
+      color: #ff9a8e;
+      font-size: 0.68em;
+      font-weight: 700;
+      margin-left: 0.5em;
+      line-height: 1;
+      vertical-align: middle;
+    }
+
+    /* ── Node preview chips (run form) ── */
+    .node-preview {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      min-height: 1.6rem;
+      margin-top: 0.55rem;
+    }
+    .node-chip {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      color: var(--muted);
+      font-family: var(--font-mono);
+    }
+    .node-chip.research { border-color: rgba(52,211,153,0.45); color: var(--green); background: rgba(52,211,153,0.07); }
+    .node-chip.planning  { border-color: rgba(251,191,36,0.45);  color: var(--yellow); background: rgba(251,191,36,0.07); }
+    .node-chip.coding    { border-color: rgba(147,129,255,0.45); color: #a78bfa;       background: rgba(147,129,255,0.07); }
+    .node-chip.general   { border-color: var(--border-strong);   color: var(--muted); }
+    .node-preview-label  { font-size: 0.7rem; color: var(--muted); align-self: center; }
+
+    /* ── Running banner ── */
+    .running-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.85rem;
+      padding: 0.85rem 1.1rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(52, 211, 153, 0.35);
+      background: rgba(52, 211, 153, 0.06);
+      margin-bottom: 1.25rem;
+      animation: feedback-in 0.35s ease both;
+    }
+    .running-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      flex-shrink: 0;
+      margin-top: 0.45rem;
+      animation: blink-dot 1.3s ease-in-out infinite;
+    }
+    @keyframes blink-dot { 0%,100%{opacity:1} 50%{opacity:0.2} }
+    .running-text { font-size: 0.88rem; color: var(--green); font-weight: 600; }
+    .running-sub  { font-size: 0.74rem; color: var(--muted); margin-top: 0.15rem; font-family: var(--font-mono); }
+
+    .run-help {
+      text-align: left;
+      font-size: 0.8rem;
+      line-height: 1.6;
+      color: var(--muted);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      background: rgba(0, 0, 0, 0.28);
+      padding: 0.85rem 1rem;
+      margin-bottom: 1.15rem;
+    }
+    .run-help p { margin: 0 0 0.6rem; }
+    .run-help p:last-child { margin-bottom: 0; }
+    .run-help code { font-family: var(--font-mono); font-size: 0.78em; }
+
+    /* ── Final answer card ── */
+    .final-answer-card {
+      background: var(--surface);
+      border: 1px solid rgba(226, 74, 59, 0.45);
+      border-radius: var(--radius);
+      padding: 1.35rem 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 0 0 1px var(--accent-soft), 0 6px 28px var(--accent-glow);
+    }
+    .final-answer-card > .section-label { margin: 0 0 1rem; }
+
+    /* ── Step eval row ── */
+    .step-eval {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-top: 0.75rem;
+      padding-top: 0.65rem;
+      border-top: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .eval-label { font-size: 0.7rem; color: var(--muted); font-weight: 500; }
+    .eval-bar { flex: 1; min-width: 60px; height: 4px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
+    .eval-fill { height: 100%; border-radius: 4px; transition: width 0.55s ease; }
+    .eval-val  { font-family: var(--font-mono); font-size: 0.7rem; font-weight: 700; min-width: 2.4rem; text-align: right; }
+    .badge-heuristic { background: rgba(255,255,255,0.05); color: var(--muted);  border: 1px solid var(--border); }
+    .badge-llm       { background: rgba(226,74,59,0.1);     color: #ff8a7a;      border: 1px solid rgba(226,74,59,0.3); }
+
+    /* ── Section label (shared) ── */
+    .section-label {
+      font-family: var(--font-sans);
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+      margin: 0 0 1rem;
+      font-weight: 700;
+      display: block;
+    }
+    .section-label.accent { color: #ff9a8e; }
   </style>
 </head>
 <body>
@@ -808,7 +1003,7 @@
       <nav class="tab-bar" role="tablist" aria-label="Viewer sections">
         <button type="button" class="tab active" id="tab-lineage" role="tab" aria-selected="true" aria-controls="panel-lineage">Genome lineage</button>
         <button type="button" class="tab" id="tab-run" role="tab" aria-selected="false" aria-controls="panel-run">Run task</button>
-        <button type="button" class="tab" id="tab-tasks" role="tab" aria-selected="false" aria-controls="panel-tasks">Task results</button>
+        <button type="button" class="tab" id="tab-tasks" role="tab" aria-selected="false" aria-controls="panel-tasks">Task results<span id="tasks-badge" class="tab-badge" hidden></span></button>
       </nav>
     </div>
 
@@ -824,8 +1019,9 @@
           <div id="run-feedback" role="status"></div>
           <form class="run-form" id="run-form" autocomplete="off">
             <div class="field">
-              <label for="run-task-text">Task (optional — leave empty to use the preset goal)</label>
-              <textarea id="run-task-text" name="task" placeholder="Describe the task, or use semicolons to split steps…"></textarea>
+              <label for="run-task-text">Task <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional — leave blank to use the preset goal below)</span></label>
+              <textarea id="run-task-text" name="task" placeholder="e.g. Research ZK proofs on Ethereum; compare gas costs; recommend one for a new DEX"></textarea>
+              <div id="run-node-preview" class="node-preview" aria-live="polite"></div>
             </div>
             <div class="field run-row">
               <div>
@@ -857,12 +1053,12 @@
               <select id="task-select" class="input" aria-label="Select task checkpoint"></select>
             </div>
             <div id="task-body"></div>
+            <div id="followup-feedback" role="status" aria-live="polite"></div>
             <div id="task-followup" class="task-followup" hidden>
               <h3>Follow-up task</h3>
               <p class="run-hint" style="margin: -0.25rem 0 1rem; border: none; padding: 0">
                 Starts a <strong>new</strong> run. Optional: include the result above as context for the model.
               </p>
-              <div id="followup-feedback" role="status" aria-live="polite"></div>
               <form id="followup-form" autocomplete="off">
                 <div class="field">
                   <label for="followup-text">What should happen next?</label>
@@ -934,9 +1130,102 @@
     /** Sync preset/mesh defaults when the selected checkpoint changes (does not clear follow-up text). */
     let lastFollowUpSyncedTaskId = null;
 
+    const PENDING_RUN_META_KEY = 'shingeki_pendingRun';
+    function savePendingRunMeta(taskId, mesh) {
+      try {
+        sessionStorage.setItem(
+          PENDING_RUN_META_KEY,
+          JSON.stringify({ taskId, mesh: !!mesh, at: Date.now() }),
+        );
+      } catch (_) {}
+    }
+    function clearPendingRunMeta() {
+      try {
+        sessionStorage.removeItem(PENDING_RUN_META_KEY);
+      } catch (_) {}
+    }
+    function getPendingRunMeta() {
+      try {
+        const s = sessionStorage.getItem(PENDING_RUN_META_KEY);
+        if (!s) return null;
+        const o = JSON.parse(s);
+        if (!o || typeof o.taskId !== 'string') return null;
+        return { taskId: o.taskId, mesh: !!o.mesh, at: Number(o.at) || 0 };
+      } catch {
+        return null;
+      }
+    }
+    /** Extra hints while waiting (mesh needs workers; long wait may mean crashed child). */
+    function pendingRunHelpHtml() {
+      const meta = getPendingRunMeta();
+      if (!pendingRunTaskId || !meta || meta.taskId !== pendingRunTaskId) return '';
+      const parts = [];
+      if (meta.mesh) {
+        parts.push(
+          '<strong>Distributed mesh</strong> is on: the run waits for <strong>at least two workers</strong> on this hub. Open extra terminals and run e.g. <code>NODE_ID=node-1 npm run node</code> and <code>NODE_ID=node-2 npm run node</code> (same machine / hub URL). Otherwise turn off <strong>Distributed mesh</strong> on <strong>Run task</strong> for local execution.',
+        );
+      } else {
+        parts.push(
+          'Local run (no mesh): first step calls Router — ensure <code>ROUTER_API_KEY</code> is set where <code>npm run hub</code> runs.',
+        );
+      }
+      const age = Date.now() - meta.at;
+      if (age > 120_000) {
+        parts.push(
+          'Still no checkpoint after ~2 minutes? The CLI may have exited (timeout, missing workers, Router error). Restart the hub with <code>SHINGEKI_HUB_LOG_CHILD_RUN=1 npm run hub</code> to print run logs in that terminal.',
+        );
+      }
+      return `<div class="run-help">${parts.map(p => `<p>${p}</p>`).join('')}</div>`;
+    }
+
+    // ── Node preview (mirrors splitCompoundTask domain inference) ──────────────
+    const _CODING_RE   = /\b(code|implement|build|write|debug|fix|refactor|deploy|program|develop)\b/i;
+    const _RESEARCH_RE = /\b(search|find|gather|research|look\s*up|fetch|investigate|survey|explore|discover)\b/i;
+    const _PLANNING_RE = /\b(plan|compare|decide|choose|recommend|select|evaluate|strategize|assess|analyse|analyze)\b/i;
+
+    function inferDomainJs(text) {
+      if (_CODING_RE.test(text))   return 'coding';
+      if (_RESEARCH_RE.test(text)) return 'research';
+      if (_PLANNING_RE.test(text)) return 'planning';
+      return 'general';
+    }
+
+    function previewNodes(taskText) {
+      const text = taskText.trim();
+      if (!text) return null;
+      const compound = text.includes(';') || /\bthen\b/i.test(text) || /\bsteps:/i.test(text);
+      const parts = compound ? text.split(/;|\bthen\b/i).map(s => s.trim()).filter(Boolean) : [text];
+      const counts = {};
+      for (const p of parts) { const d = inferDomainJs(p); counts[d] = (counts[d] ?? 0) + 1; }
+      const result = {};
+      for (const [d, n] of Object.entries(counts)) result[d] = Math.min(n, 2);
+      const total = Object.values(result).reduce((a, b) => a + b, 0);
+      if (total < 2) { const first = Object.keys(result)[0] ?? 'general'; result[first] = 2; }
+      return result;
+    }
+
+    function renderNodePreview(taskText) {
+      const el = document.getElementById('run-node-preview');
+      if (!el) return;
+      const nodes = previewNodes(taskText);
+      if (!nodes) { el.innerHTML = ''; return; }
+      const total = Object.values(nodes).reduce((a, b) => a + b, 0);
+      const chips = Object.entries(nodes).map(([d, n]) =>
+        `<span class="node-chip ${d}">${n}× ${d}</span>`).join('');
+      el.innerHTML = `<span class="node-preview-label">will spawn ${total} node${total !== 1 ? 's' : ''}:</span>${chips}`;
+    }
+
+    document.getElementById('run-task-text').addEventListener('input', e => {
+      renderNodePreview(e.target.value);
+    });
+
     tabLineage.addEventListener('click', () => setTab('lineage'));
     tabRun.addEventListener('click', () => setTab('run'));
-    tabTasks.addEventListener('click', () => setTab('tasks'));
+    tabTasks.addEventListener('click', () => {
+      setTab('tasks');
+      // If the task panel still shows the initial skeleton (no data yet), kick off a fresh poll
+      if (!checkpointsCache.length && !checkpointDetail) poll();
+    });
 
     function setTab(which) {
       const onLineage = which === 'lineage';
@@ -975,6 +1264,9 @@
       followupFeedback.className = '';
       followupFeedback.textContent = '';
     }
+
+    /** Must match `VIEWER_FOLLOWUP_SEPARATOR` in `src/orchestrator/planner.ts` (planner single-step guard). */
+    const FOLLOWUP_TASK_SEP = '\n\n---\n\n**Follow-up:**\n\n';
 
     /** Prior summary + steps for the next run’s `--task` text (truncated). */
     function buildFollowUpContext(cp) {
@@ -1039,7 +1331,7 @@
       }
       let task = userText;
       if (followupInclude.checked) {
-        task = buildFollowUpContext(cp) + '\n\n---\n\n**Follow-up:**\n\n' + userText;
+        task = buildFollowUpContext(cp) + FOLLOWUP_TASK_SEP + userText;
       }
       const resume = followupResume.checked;
       const preset = resume ? (cp.preset === 'japan' ? 'japan' : 'gpu') : followupPreset.value;
@@ -1049,19 +1341,31 @@
       if (task) body.task = task;
       if (resume) body.resume = cp.taskId;
 
-      followupSubmit.disabled = true;
+      setButtonLoading(followupSubmit, true);
       try {
         const res = await fetch('/api/run', { method: 'POST', headers, body: JSON.stringify(body) });
         const data = await res.json().catch(() => ({}));
         if (res.status === 202 && data.accepted && data.taskId) {
           pendingRunTaskId = data.taskId;
-          showFollowupFeedback(true, 'Follow-up started — task id ' + data.taskId + '. Results appear above when steps complete.');
+          savePendingRunMeta(data.taskId, mesh);
           selectedTaskId = data.taskId;
-          await poll();
+          checkpointDetail = null;
+          fillTaskSelect();
+          setTab('tasks');
+          taskBody.innerHTML = skeletonPanel();
+          followupText.value = '';
+          showFollowupFeedback(
+            true,
+            'Follow-up run started — task id ' + data.taskId + '. First step output appears in the area above when ready (often 30–120s). This message stays visible while the run is starting.',
+          );
+          followupFeedback.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          poll();
         } else if (res.status === 401) {
           showFollowupFeedback(false, 'Unauthorized — hub requires SHINGEKI_HUB_TOKEN; open the viewer from this machine (localhost) or unset the token for local dev.');
         } else if (res.status === 400 && data.error === 'env') {
           showFollowupFeedback(false, (data.errors || []).join(' ') || 'Environment check failed (e.g. ROUTER_API_KEY).');
+        } else if (res.status === 400 && data.error === 'mesh_workers') {
+          showFollowupFeedback(false, data.message || 'Not enough mesh workers connected to this hub.');
         } else if (res.status === 404) {
           showFollowupFeedback(
             false,
@@ -1075,7 +1379,7 @@
       } catch (e) {
         showFollowupFeedback(false, e.message || String(e));
       } finally {
-        followupSubmit.disabled = false;
+        setButtonLoading(followupSubmit, false);
       }
     });
 
@@ -1092,20 +1396,27 @@
       if (task) body.task = task;
       if (resume) body.resume = resume;
 
-      runSubmit.disabled = true;
+      setButtonLoading(runSubmit, true);
       try {
         const res = await fetch('/api/run', { method: 'POST', headers, body: JSON.stringify(body) });
         const data = await res.json().catch(() => ({}));
         if (res.status === 202 && data.accepted && data.taskId) {
           pendingRunTaskId = data.taskId;
-          showRunFeedback(true, 'Run started — task id ' + data.taskId + '. Results appear in Task results after the first step completes.');
+          savePendingRunMeta(data.taskId, mesh);
           selectedTaskId = data.taskId;
+          checkpointDetail = null;
+          fillTaskSelect();
           setTab('tasks');
-          await poll();
+          taskBody.innerHTML = skeletonPanel();
+          taskBody.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          hideRunFeedback();
+          poll();
         } else if (res.status === 401) {
           showRunFeedback(false, 'Unauthorized — hub requires SHINGEKI_HUB_TOKEN; open the viewer from this machine (localhost) or unset the token for local dev.');
         } else if (res.status === 400 && data.error === 'env') {
           showRunFeedback(false, (data.errors || []).join(' ') || 'Environment check failed (e.g. ROUTER_API_KEY).');
+        } else if (res.status === 400 && data.error === 'mesh_workers') {
+          showRunFeedback(false, data.message || 'Not enough mesh workers connected to this hub.');
         } else if (res.status === 404) {
           showRunFeedback(
             false,
@@ -1119,12 +1430,14 @@
       } catch (e) {
         showRunFeedback(false, e.message || String(e));
       } finally {
-        runSubmit.disabled = false;
+        setButtonLoading(runSubmit, false);
       }
     });
 
     taskSelect.addEventListener('change', async () => {
       selectedTaskId = taskSelect.value || null;
+      checkpointDetail = null;
+      taskBody.innerHTML = skeletonPanel();
       await fetchCheckpointDetail();
       renderTaskPanel();
     });
@@ -1227,6 +1540,7 @@
       const ids = checkpointsCache.map(c => c.taskId);
       if (pendingRunTaskId && ids.includes(pendingRunTaskId)) {
         pendingRunTaskId = null;
+        clearPendingRunMeta();
       }
       if (!ids.length) {
         selectedTaskId = pendingRunTaskId ?? null;
@@ -1254,7 +1568,8 @@
         const opt = document.createElement('option');
         opt.value = c.taskId;
         const t = new Date(c.updatedAt).toLocaleString(undefined, { hour12: false });
-        opt.textContent = `${c.taskId} · ${t} · ${c.stepCount} step(s)`;
+        const preview = c.summaryPreview ? ` — ${c.summaryPreview.slice(0, 60).replace(/\s+/g, ' ')}…` : '';
+        opt.textContent = `${c.taskId} · ${t} · ${c.stepCount}/${c.nextStepIndex} steps${preview}`;
         taskSelect.appendChild(opt);
       }
       const valid =
@@ -1303,53 +1618,126 @@
       }
     }
 
+    function skeletonPanel() {
+      return `<div class="skeleton-panel">
+        <div class="skel-line h1"></div>
+        <div class="skel-line h2"></div>
+        <div class="skel-line p w100"></div>
+        <div class="skel-line p w85"></div>
+        <div class="skel-line p w70"></div>
+        <div class="skel-block">
+          <div class="skel-line h2"></div>
+          <div class="skel-line p w100"></div>
+          <div class="skel-line p w85"></div>
+          <div class="skel-line p w70"></div>
+        </div>
+        <div class="skel-block">
+          <div class="skel-line h2"></div>
+          <div class="skel-line p w100"></div>
+          <div class="skel-line p w70"></div>
+          <div class="skel-line p w50"></div>
+        </div>
+      </div>`;
+    }
+
+    function setButtonLoading(btn, loading) {
+      if (loading) {
+        btn.dataset.origText = btn.textContent;
+        btn.disabled = true;
+        btn.innerHTML = `<span class="btn-spinner" aria-hidden="true"></span>${escapeHtml(btn.dataset.origText)}`;
+      } else {
+        btn.disabled = false;
+        btn.textContent = btn.dataset.origText || btn.textContent;
+        delete btn.dataset.origText;
+      }
+    }
+
     function renderTaskPanel() {
       try {
+        // Running banner — shown while a fresh run has no checkpoint yet.
+        const runningBanner = pendingRunTaskId
+          ? `<div class="running-banner">
+               <div class="running-dot"></div>
+               <div>
+                 <div class="running-text">Run in progress</div>
+                 <div class="running-sub">${escapeHtml(pendingRunTaskId)} · waiting for first step…</div>
+               </div>
+             </div>`
+          : '';
+        const runWaitExtras = runningBanner + pendingRunHelpHtml();
+
         if (!checkpointsCache.length) {
-          if (pendingRunTaskId) {
-            taskBody.innerHTML =
-              '<div class="empty"><strong>Run in progress.</strong><br>No checkpoint on disk yet — the first step must finish before results appear (often 30–120s). This view refreshes automatically.</div>';
-            return;
-          }
-          taskBody.innerHTML =
-            '<div class="empty">No checkpoint files yet.<br>Use the <strong>Run task</strong> tab, or <code>npm run run</code> on the same machine as this hub (<code>SHINGEKI_CHECKPOINT_DIR</code> → <code>shingeki/.checkpoints</code> by default).</div>';
+          taskBody.innerHTML = runWaitExtras +
+            (pendingRunTaskId
+              ? '<div class="empty"><strong>Starting up.</strong><br>The first step must finish before results appear (30–120 s typical). This view refreshes automatically.</div>'
+              : '<div class="empty">No checkpoints yet.<br>Use the <strong>Run task</strong> tab, or <code>npm run run</code> on this machine.</div>');
           return;
         }
         if (!checkpointDetail) {
           const inList = selectedTaskId && checkpointsCache.some(c => c.taskId === selectedTaskId);
-          if (selectedTaskId && !inList) {
-            taskBody.innerHTML =
-              '<div class="empty"><strong>Waiting for checkpoint.</strong><br>Task <code>' +
-              escapeHtml(selectedTaskId) +
-              '</code> is starting — the hub will show output here once the first step completes.</div>';
-            return;
-          }
-          taskBody.innerHTML =
-            '<div class="empty">Could not load this checkpoint. Try another selection or wait and refresh.</div>';
+          taskBody.innerHTML = runWaitExtras + (inList
+            ? skeletonPanel()
+            : selectedTaskId
+              ? `<div class="empty"><strong>Waiting for checkpoint.</strong><br>Task <code>${escapeHtml(selectedTaskId)}</code> is starting — first step result lands here automatically.</div>`
+              : '<div class="empty">Select a task above.</div>');
           return;
         }
+
         const cp = checkpointDetail;
-        const steps = (cp.results || []).map((r, i) => `
-        <div class="step-card">
-          <h3>${escapeHtml(r.stepId)}</h3>
-          <div class="sub">node ${escapeHtml(r.nodeId)} · ${r.latencyMs} ms</div>
-          <div class="md-content step-output-md">${renderMarkdown(r.output)}</div>
-        </div>
-      `).join('');
-        const summaryMd = renderMarkdown(cp.summary);
+        const results = cp.results || [];
+        const totalSteps = results.length;
+        const lastResult = results[results.length - 1];
+
+        // Step cards with eval row.
+        const stepCards = results.map(r => {
+          const ev = r.evalResult;
+          let evalHtml = '';
+          if (ev) {
+            const s = Math.max(0, Math.min(1, ev.score ?? 0));
+            const pct = (s * 100).toFixed(1);
+            const col = s >= 0.75 ? '#34d399' : s >= 0.55 ? '#fbbf24' : '#f87171';
+            const pathBadge = ev.path === 'llm'
+              ? `<span class="badge badge-llm">LLM judge${ev.tee_verified ? ' TEE ✓' : ''}</span>`
+              : `<span class="badge badge-heuristic">heuristic</span>`;
+            evalHtml = `
+              <div class="step-eval">
+                <span class="eval-label">fitness</span>
+                <div class="eval-bar"><div class="eval-fill" style="width:${pct}%;background:${col}"></div></div>
+                <span class="eval-val" style="color:${col}">${s.toFixed(2)}</span>
+                ${pathBadge}
+              </div>`;
+          }
+          return `
+            <div class="step-card">
+              <h3>${escapeHtml(r.stepId)}</h3>
+              <div class="sub">node <strong>${escapeHtml(r.nodeId)}</strong> · ${r.latencyMs} ms</div>
+              <div class="md-content step-output-md">${renderMarkdown(r.output)}</div>
+              ${evalHtml}
+            </div>`;
+        }).join('');
+
+        // Final answer card — only show when at least 1 step is done.
+        const finalAnswerHtml = lastResult ? `
+          <div class="final-answer-card">
+            <span class="section-label accent">Final answer</span>
+            <div class="md-content">${renderMarkdown(lastResult.output)}</div>
+          </div>` : '';
+
         taskBody.innerHTML = `
-        <div class="task-meta">
-          <span>task: <strong>${escapeHtml(cp.taskId)}</strong></span>
-          <span>preset: ${escapeHtml(cp.preset)}</span>
-          <span>mesh: ${cp.mesh ? 'yes' : 'no'}</span>
-          <span>next step index: ${cp.nextStepIndex}</span>
-        </div>
-        <div class="task-summary">
-          <h2>Final summary</h2>
-          <div class="md-content">${summaryMd || '<p class="md-empty" style="color:var(--muted);margin:0">No summary yet.</p>'}</div>
-        </div>
-        ${steps ? `<div class="steps-label">Step outputs</div>${steps}` : '<div class="empty" style="padding:2rem 0">No step results in this checkpoint.</div>'}
-      `;
+          ${runWaitExtras}
+          <div class="task-meta">
+            <span>task: <strong>${escapeHtml(cp.taskId)}</strong></span>
+            <span>preset: ${escapeHtml(cp.preset)}</span>
+            <span>mesh: ${cp.mesh ? 'yes' : 'no'}</span>
+            <span>steps: <strong>${totalSteps}</strong> complete</span>
+          </div>
+          <div class="task-summary">
+            <h2>Goal</h2>
+            <div class="md-content">${renderMarkdown(cp.summary) || '<p style="color:var(--muted);margin:0">—</p>'}</div>
+          </div>
+          ${finalAnswerHtml}
+          ${totalSteps ? `<div class="steps-label">Step trace (${totalSteps} step${totalSteps !== 1 ? 's' : ''})</div>${stepCards}` : ''}
+        `;
       } finally {
         refreshFollowUpPanel();
       }
@@ -1379,8 +1767,18 @@
         await fetchCheckpointDetail();
         renderTaskPanel();
 
-        statusEl.textContent =
-          `live · ${lineageData.length} genome${lineageData.length !== 1 ? 's' : ''} · ${checkpointsCache.length} checkpoint${checkpointsCache.length !== 1 ? 's' : ''}`;
+        // Tab badge.
+        const badge = document.getElementById('tasks-badge');
+        if (badge) {
+          badge.textContent = String(checkpointsCache.length);
+          badge.hidden = checkpointsCache.length === 0;
+        }
+
+        // Status pill.
+        const runActive = !!pendingRunTaskId;
+        statusEl.textContent = runActive
+          ? `running · ${checkpointsCache.length} checkpoint${checkpointsCache.length !== 1 ? 's' : ''}`
+          : `live · ${lineageData.length} genome${lineageData.length !== 1 ? 's' : ''} · ${checkpointsCache.length} checkpoint${checkpointsCache.length !== 1 ? 's' : ''}`;
         statusEl.className = 'ok';
       } catch (e) {
         statusEl.textContent = `error: ${e.message}`;
@@ -1388,6 +1786,7 @@
       }
     }
 
+    taskBody.innerHTML = skeletonPanel();
     poll();
     setInterval(poll, 3000);
   </script>

@@ -47,3 +47,21 @@ test('splitCompoundTask preserves taskId', () => {
   const plan = splitCompoundTask('my-task-123', 'Find the best approach');
   assert.equal(plan.taskId, 'my-task-123');
 });
+
+test('viewer follow-up with huge prior context stays a single step', () => {
+  const sep = '\n\n---\n\n**Follow-up:**\n\n';
+  const prior = [
+    '## Prior run: `t-1`',
+    'Line1; line2; line3',
+    '- bullet a',
+    '- bullet b',
+    '### Step outputs',
+    '#### s1',
+    'Some; semicolons; here',
+  ].join('\n');
+  const full = prior + sep + 'Research the cost impact briefly.';
+  const plan = splitCompoundTask('t-follow', full);
+  assert.equal(plan.steps.length, 1, 'must not split on newlines/; inside pasted context');
+  assert.ok(plan.steps[0]!.description.includes('semicolons'), 'step keeps full task string');
+  assert.equal(plan.steps[0]!.domain, 'research', 'domain from user follow-up line only');
+});

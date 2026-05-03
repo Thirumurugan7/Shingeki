@@ -312,3 +312,36 @@ test('POST /api/run returns 400 env when ROUTER_API_KEY missing', async t => {
     await close();
   }
 });
+
+test('POST /api/run returns 400 mesh_workers when mesh=true but hub has no workers', async t => {
+  const prevKey = process.env.ROUTER_API_KEY;
+  process.env.ROUTER_API_KEY = 'test-router-key-integration';
+  const prevSkip = process.env.SHINGEKI_HUB_SKIP_MESH_WORKER_CHECK;
+  delete process.env.SHINGEKI_HUB_SKIP_MESH_WORKER_CHECK;
+  t.after(() => {
+    if (prevKey !== undefined) process.env.ROUTER_API_KEY = prevKey;
+    else delete process.env.ROUTER_API_KEY;
+    if (prevSkip !== undefined) process.env.SHINGEKI_HUB_SKIP_MESH_WORKER_CHECK = prevSkip;
+    else delete process.env.SHINGEKI_HUB_SKIP_MESH_WORKER_CHECK;
+  });
+
+  const hub = new MeshHub({ port: 0 });
+  const { httpServer, close } = await hub.listen();
+  try {
+    const addr = httpServer.address();
+    assert.ok(addr && typeof addr === 'object');
+    const port = addr.port;
+    const res = await fetch(`http://127.0.0.1:${port}/api/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ preset: 'gpu', mesh: true }),
+    });
+    assert.equal(res.status, 400);
+    const j = (await res.json()) as { error: string; workers?: number; need?: number };
+    assert.equal(j.error, 'mesh_workers');
+    assert.equal(j.workers, 0);
+    assert.ok(typeof j.need === 'number' && j.need >= 2);
+  } finally {
+    await close();
+  }
+});

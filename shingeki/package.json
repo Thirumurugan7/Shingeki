@@ -8,6 +8,7 @@
     "run": "node --import tsx src/cli.ts run",
     "demo": "node --import tsx src/cli.ts demo",
     "hub": "node --import tsx src/cli.ts hub",
+    "hub:watch": "node --watch --import tsx src/cli.ts hub",
     "node": "node --import tsx src/cli.ts node",
     "start": "node --import tsx src/cli.ts",
     "typecheck": "tsc --noEmit",

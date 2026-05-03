@@ -26,6 +26,7 @@ import {
   hubMaxPayloadBytes,
   hubReadyMinWorkers,
   hubTlsCredentials,
+  meshMinWorkersForOrchestrator,
 } from '../config/runtime-config.js';
 
 const log = createLogger('mesh-hub');
@@ -256,6 +257,24 @@ export class MeshHub {
       res.writeHead(400, JSON_CORS);
       res.end(JSON.stringify({ error: parsed.message }));
       return;
+    }
+
+    const skipMeshWorkerCheck = process.env.SHINGEKI_HUB_SKIP_MESH_WORKER_CHECK?.trim() === '1';
+    if (!skipMeshWorkerCheck && parsed.argv.includes('--mesh')) {
+      const need = meshMinWorkersForOrchestrator();
+      const have = this.workers.size;
+      if (have < need) {
+        res.writeHead(400, JSON_CORS);
+        res.end(
+          JSON.stringify({
+            error: 'mesh_workers',
+            workers: have,
+            need,
+            message: `Distributed mesh needs at least ${need} worker(s) on this hub; ${have} connected. In separate shells run e.g. NODE_ID=node-1 npm run node and NODE_ID=node-2 npm run node, or uncheck "Distributed mesh" for a local in-process run.`,
+          }),
+        );
+        return;
+      }
     }
 
     const child = spawn(process.execPath, ['--import', 'tsx', CLI_TS, 'run', ...parsed.argv], {

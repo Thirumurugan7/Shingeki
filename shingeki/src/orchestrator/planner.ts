@@ -10,6 +10,12 @@ const CODING_RE = /\b(code|implement|build|write|debug|fix|refactor|deploy|progr
 const RESEARCH_RE = /\b(search|find|gather|research|look up|fetch|investigate|survey|explore|discover)\b/i;
 const PLANNING_RE = /\b(plan|compare|decide|choose|recommend|select|evaluate|strategize|assess|analyse|analyze)\b/i;
 
+/**
+ * Same marker as the hub viewer `buildFollowUpContext` + follow-up field — prior steps often contain
+ * `;`, newlines, and bullets; {@link planTask} would mis-classify that as “compound” and split into hundreds of steps.
+ */
+export const VIEWER_FOLLOWUP_SEPARATOR = '\n\n---\n\n**Follow-up:**\n\n';
+
 function inferDomain(text: string): Step['domain'] {
   if (CODING_RE.test(text)) return 'coding';
   if (RESEARCH_RE.test(text)) return 'research';
@@ -51,6 +57,21 @@ export function planTask(taskId: string, taskText: string): Plan {
  * Used when the user provides a free-form --task string via the CLI.
  */
 export function splitCompoundTask(taskId: string, taskText: string): Plan {
+  if (taskText.includes(VIEWER_FOLLOWUP_SEPARATOR)) {
+    const idx = taskText.lastIndexOf(VIEWER_FOLLOWUP_SEPARATOR);
+    const userPart = taskText.slice(idx + VIEWER_FOLLOWUP_SEPARATOR.length);
+    return {
+      taskId,
+      steps: [
+        {
+          id: nextId('step'),
+          description: taskText.trim(),
+          domain: inferDomain(userPart.trim()),
+        },
+      ],
+    };
+  }
+
   const base = planTask(taskId, taskText);
   return {
     ...base,

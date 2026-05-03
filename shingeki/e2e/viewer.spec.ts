@@ -46,7 +46,9 @@ test.describe('Shingeki hub viewer', () => {
 
     await page.locator('#followup-text').fill(followLine);
     await page.locator('#followup-submit').click();
-    await expect(page.locator('#followup-feedback')).toContainText(/Follow-up started/i, { timeout: 30_000 });
+    await expect(page.locator('#followup-feedback')).toContainText(/Follow-up run started|Follow-up started/i, {
+      timeout: 30_000,
+    });
 
     const started = Date.now();
     let sawPong2 = false;

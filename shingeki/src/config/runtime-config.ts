@@ -2,6 +2,33 @@
  * Central runtime flags — fail fast in production for unsafe defaults.
  */
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import yaml from 'yaml';
+
+const RUNTIME_CFG_DIR = path.dirname(fileURLToPath(import.meta.url));
+const SHINGEKI_PKG_ROOT = path.resolve(RUNTIME_CFG_DIR, '..', '..');
+
+let meshMinWorkersCached: number | undefined;
+
+/**
+ * Minimum workers the mesh orchestrator waits for — same formula as CLI mesh runs:
+ * `Math.max(2, cfg.mesh?.min_nodes ?? 2)` from `agentmesh.example.yaml` (or `SHINGEKI_AGENTMESH_CONFIG`).
+ */
+export function meshMinWorkersForOrchestrator(): number {
+  if (meshMinWorkersCached !== undefined) return meshMinWorkersCached;
+  const cfgPath =
+    process.env.SHINGEKI_AGENTMESH_CONFIG?.trim() || path.join(SHINGEKI_PKG_ROOT, 'agentmesh.example.yaml');
+  try {
+    const raw = fs.readFileSync(cfgPath, 'utf8');
+    const doc = yaml.parse(raw) as { mesh?: { min_nodes?: number } };
+    const n = doc?.mesh?.min_nodes;
+    meshMinWorkersCached = Math.max(2, typeof n === 'number' && Number.isFinite(n) ? Math.floor(n) : 2);
+  } catch {
+    meshMinWorkersCached = 2;
+  }
+  return meshMinWorkersCached;
+}
 
 export function hubTlsCredentials(): { key: Buffer; cert: Buffer } | null {
   const certPath = process.env.SHINGEKI_HUB_TLS_CERT?.trim();

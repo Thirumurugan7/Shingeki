@@ -1,0 +1,10 @@
+---
+description: Restart mesh hub after Shingeki backend/hub changes
+globs: shingeki/**/*
+---
+
+When you change **hub behavior or anything the spawned `cli run` loads** (e.g. `src/coordination/ws-hub.ts`, `src/cli.ts`, `src/config/`, `src/orchestrator/`, `src/infra/checkpoint.ts`, `src/og/`, env checks), **restart the hub** so the running process picks up the code.
+
+- Prefer **`cd shingeki && npm run hub:watch`** during development — Node restarts the hub when imported TS files change.
+- **`src/viewer/index.html`** is read on **each** `GET /viewer`; a **browser refresh** is enough for viewer-only edits (no hub restart).
+- After edits in this session, if the user has `npm run hub` running, tell them to stop it (Ctrl+C) and start **`npm run hub:watch`** or **`npm run hub`** again.

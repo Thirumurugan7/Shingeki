@@ -1,6 +1,7 @@
 /** 0G Log Store — append-only lineage blobs (execution traces). */
 import { Indexer, MemData } from '@0gfoundation/0g-ts-sdk';
 import type { Wallet } from 'ethers';
+import { indexerUploadRetryOpts } from './indexer-retry.js';
 import type { ExecutionTraceEntry } from '../types.js';
 
 export async function appendTrace(
@@ -14,7 +15,13 @@ export async function appendTrace(
   const mem = new MemData(bytes);
   const [, treeErr] = await mem.merkleTree();
   if (treeErr !== null) throw new Error(`merkle: ${treeErr}`);
-  const [tx, err] = await indexer.upload(mem, rpcUrl, signer as never);
+  const [tx, err] = await indexer.upload(
+    mem,
+    rpcUrl,
+    signer as never,
+    undefined,
+    indexerUploadRetryOpts(),
+  );
   if (err !== null) throw new Error(`upload: ${err}`);
   const rootHash = 'rootHash' in tx ? tx.rootHash : tx.rootHashes[0];
   const txHash = 'txHash' in tx ? tx.txHash : tx.txHashes[0];

@@ -330,6 +330,89 @@
 
     .task-wrap { max-width: 720px; margin: 0 auto; }
 
+    .task-followup {
+      margin-top: 2rem;
+      padding: 1.35rem 1.5rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--border-strong);
+      background: rgba(0, 0, 0, 0.25);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+    }
+    .task-followup[hidden] { display: none !important; }
+    .task-followup h3 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin: 0 0 0.9rem;
+      font-weight: 700;
+    }
+    .task-followup .field { margin-bottom: 1rem; }
+    .task-followup label {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+    .task-followup textarea {
+      width: 100%;
+      min-height: 5.5rem;
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-strong);
+      background: rgba(0, 0, 0, 0.35);
+      color: var(--text);
+      line-height: 1.5;
+      resize: vertical;
+    }
+    .task-followup textarea:focus-visible {
+      outline: none;
+      border-color: rgba(226, 74, 59, 0.55);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    .task-followup .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem 1.5rem;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .task-followup label.inline {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      font-weight: 500;
+      text-transform: none;
+      letter-spacing: normal;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .task-followup .primary { margin-top: 0.25rem; }
+    #followup-feedback {
+      margin-bottom: 1rem;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.86rem;
+      display: none;
+      line-height: 1.5;
+    }
+    #followup-feedback.visible { display: block; }
+    #followup-feedback.ok {
+      border: 1px solid rgba(52, 211, 153, 0.35);
+      background: rgba(52, 211, 153, 0.08);
+      color: var(--green);
+    }
+    #followup-feedback.err {
+      border: 1px solid rgba(248, 113, 113, 0.45);
+      background: rgba(248, 113, 113, 0.08);
+      color: #fecaca;
+    }
+
     .task-toolbar {
       display: flex;
       flex-wrap: wrap;
@@ -774,6 +857,42 @@
               <select id="task-select" class="input" aria-label="Select task checkpoint"></select>
             </div>
             <div id="task-body"></div>
+            <div id="task-followup" class="task-followup" hidden>
+              <h3>Follow-up task</h3>
+              <p class="run-hint" style="margin: -0.25rem 0 1rem; border: none; padding: 0">
+                Starts a <strong>new</strong> run. Optional: include the result above as context for the model.
+              </p>
+              <div id="followup-feedback" role="status" aria-live="polite"></div>
+              <form id="followup-form" autocomplete="off">
+                <div class="field">
+                  <label for="followup-text">What should happen next?</label>
+                  <textarea id="followup-text" placeholder="e.g. Add a section on cost; refine strategy 2; fix the table…"></textarea>
+                </div>
+                <div class="field">
+                  <label class="inline">
+                    <input type="checkbox" id="followup-include" checked />
+                    Include this checkpoint’s summary &amp; step outputs in the prompt (readme-style context)
+                  </label>
+                </div>
+                <div class="field">
+                  <label class="inline">
+                    <input type="checkbox" id="followup-resume" />
+                    Continue this checkpoint (<code>--resume</code>) — uses this task’s preset &amp; mesh
+                  </label>
+                </div>
+                <div class="row">
+                  <div>
+                    <label for="followup-preset">Preset</label>
+                    <select id="followup-preset" class="input">
+                      <option value="gpu">GPU research</option>
+                      <option value="japan">Japan trip</option>
+                    </select>
+                  </div>
+                  <label class="inline"><input type="checkbox" id="followup-mesh" /> Distributed mesh</label>
+                </div>
+                <button type="submit" class="primary" id="followup-submit">Run follow-up</button>
+              </form>
+            </div>
           </div>
         </div>
       </div>
@@ -793,6 +912,15 @@
     const panelTasks = document.getElementById('panel-tasks');
     const taskSelect = document.getElementById('task-select');
     const taskBody = document.getElementById('task-body');
+    const taskFollowup = document.getElementById('task-followup');
+    const followupForm = document.getElementById('followup-form');
+    const followupText = document.getElementById('followup-text');
+    const followupInclude = document.getElementById('followup-include');
+    const followupResume = document.getElementById('followup-resume');
+    const followupPreset = document.getElementById('followup-preset');
+    const followupMesh = document.getElementById('followup-mesh');
+    const followupFeedback = document.getElementById('followup-feedback');
+    const followupSubmit = document.getElementById('followup-submit');
     const runForm = document.getElementById('run-form');
     const runFeedback = document.getElementById('run-feedback');
     const runSubmit = document.getElementById('run-submit');
@@ -803,6 +931,8 @@
     let checkpointDetail = null;
     /** Task id from last POST /api/run until it appears in /checkpoints (avoids dropping selection + confusing errors). */
     let pendingRunTaskId = null;
+    /** Sync preset/mesh defaults when the selected checkpoint changes (does not clear follow-up text). */
+    let lastFollowUpSyncedTaskId = null;
 
     tabLineage.addEventListener('click', () => setTab('lineage'));
     tabRun.addEventListener('click', () => setTab('run'));
@@ -835,6 +965,119 @@
       runFeedback.className = '';
       runFeedback.textContent = '';
     }
+
+    function showFollowupFeedback(ok, text) {
+      followupFeedback.textContent = text;
+      followupFeedback.className = 'visible ' + (ok ? 'ok' : 'err');
+    }
+
+    function hideFollowupFeedback() {
+      followupFeedback.className = '';
+      followupFeedback.textContent = '';
+    }
+
+    /** Prior summary + steps for the next run’s `--task` text (truncated). */
+    function buildFollowUpContext(cp) {
+      const lines = [];
+      lines.push('## Prior run: `' + String(cp.taskId) + '`');
+      lines.push('');
+      lines.push('### Summary');
+      lines.push(String(cp.summary || '').trim() || '(none)');
+      lines.push('');
+      lines.push('### Step outputs');
+      for (const r of cp.results || []) {
+        lines.push('');
+        lines.push('#### ' + String(r.stepId));
+        lines.push(String(r.output || '').trim() || '(empty)');
+      }
+      let text = lines.join('\n');
+      const max = 12000;
+      if (text.length > max) {
+        text = text.slice(0, max) + '\n\n…(truncated)';
+      }
+      return text;
+    }
+
+    function setFollowupResumeMode(on) {
+      const cp = checkpointDetail;
+      const lock = on && !!cp;
+      followupPreset.disabled = lock;
+      followupMesh.disabled = lock;
+      if (lock && cp) {
+        followupPreset.value = cp.preset === 'japan' ? 'japan' : 'gpu';
+        followupMesh.checked = !!cp.mesh;
+      }
+    }
+
+    function refreshFollowUpPanel() {
+      const cp = checkpointDetail;
+      const canShow = !!cp && checkpointsCache.length > 0;
+      taskFollowup.hidden = !canShow;
+      if (!canShow || !cp) return;
+      if (lastFollowUpSyncedTaskId !== cp.taskId) {
+        lastFollowUpSyncedTaskId = cp.taskId;
+        followupPreset.value = cp.preset === 'japan' ? 'japan' : 'gpu';
+        followupMesh.checked = !!cp.mesh;
+      }
+      setFollowupResumeMode(followupResume.checked);
+    }
+
+    followupResume.addEventListener('change', () => setFollowupResumeMode(followupResume.checked));
+
+    followupForm.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      hideFollowupFeedback();
+      const cp = checkpointDetail;
+      if (!cp) {
+        showFollowupFeedback(false, 'No checkpoint loaded — select a task above.');
+        return;
+      }
+      const userText = followupText.value.trim();
+      if (!userText) {
+        showFollowupFeedback(false, 'Describe what should happen next.');
+        return;
+      }
+      let task = userText;
+      if (followupInclude.checked) {
+        task = buildFollowUpContext(cp) + '\n\n---\n\n**Follow-up:**\n\n' + userText;
+      }
+      const resume = followupResume.checked;
+      const preset = resume ? (cp.preset === 'japan' ? 'japan' : 'gpu') : followupPreset.value;
+      const mesh = resume ? !!cp.mesh : followupMesh.checked;
+      const headers = { 'Content-Type': 'application/json' };
+      const body = { preset, mesh };
+      if (task) body.task = task;
+      if (resume) body.resume = cp.taskId;
+
+      followupSubmit.disabled = true;
+      try {
+        const res = await fetch('/api/run', { method: 'POST', headers, body: JSON.stringify(body) });
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 202 && data.accepted && data.taskId) {
+          pendingRunTaskId = data.taskId;
+          showFollowupFeedback(true, 'Follow-up started — task id ' + data.taskId + '. Results appear above when steps complete.');
+          selectedTaskId = data.taskId;
+          await poll();
+        } else if (res.status === 401) {
+          showFollowupFeedback(false, 'Unauthorized — hub requires SHINGEKI_HUB_TOKEN; open the viewer from this machine (localhost) or unset the token for local dev.');
+        } else if (res.status === 400 && data.error === 'env') {
+          showFollowupFeedback(false, (data.errors || []).join(' ') || 'Environment check failed (e.g. ROUTER_API_KEY).');
+        } else if (res.status === 404) {
+          showFollowupFeedback(
+            false,
+            data.task
+              ? 'Checkpoint not found yet — wait for the run to write its first step, then refresh.'
+              : 'Hub route not found — restart `npm run hub` from the shingeki folder (POST /api/run).',
+          );
+        } else {
+          showFollowupFeedback(false, data.error || data.message || ('HTTP ' + res.status));
+        }
+      } catch (e) {
+        showFollowupFeedback(false, e.message || String(e));
+      } finally {
+        followupSubmit.disabled = false;
+      }
+    });
 
     runForm.addEventListener('submit', async ev => {
       ev.preventDefault();
@@ -1061,39 +1304,40 @@
     }
 
     function renderTaskPanel() {
-      if (!checkpointsCache.length) {
-        if (pendingRunTaskId) {
+      try {
+        if (!checkpointsCache.length) {
+          if (pendingRunTaskId) {
+            taskBody.innerHTML =
+              '<div class="empty"><strong>Run in progress.</strong><br>No checkpoint on disk yet — the first step must finish before results appear (often 30–120s). This view refreshes automatically.</div>';
+            return;
+          }
           taskBody.innerHTML =
-            '<div class="empty"><strong>Run in progress.</strong><br>No checkpoint on disk yet — the first step must finish before results appear (often 30–120s). This view refreshes automatically.</div>';
+            '<div class="empty">No checkpoint files yet.<br>Use the <strong>Run task</strong> tab, or <code>npm run run</code> on the same machine as this hub (<code>SHINGEKI_CHECKPOINT_DIR</code> → <code>shingeki/.checkpoints</code> by default).</div>';
           return;
         }
-        taskBody.innerHTML =
-          '<div class="empty">No checkpoint files yet.<br>Use the <strong>Run task</strong> tab, or <code>npm run run</code> on the same machine as this hub (<code>SHINGEKI_CHECKPOINT_DIR</code> → <code>shingeki/.checkpoints</code> by default).</div>';
-        return;
-      }
-      if (!checkpointDetail) {
-        const inList = selectedTaskId && checkpointsCache.some(c => c.taskId === selectedTaskId);
-        if (selectedTaskId && !inList) {
+        if (!checkpointDetail) {
+          const inList = selectedTaskId && checkpointsCache.some(c => c.taskId === selectedTaskId);
+          if (selectedTaskId && !inList) {
+            taskBody.innerHTML =
+              '<div class="empty"><strong>Waiting for checkpoint.</strong><br>Task <code>' +
+              escapeHtml(selectedTaskId) +
+              '</code> is starting — the hub will show output here once the first step completes.</div>';
+            return;
+          }
           taskBody.innerHTML =
-            '<div class="empty"><strong>Waiting for checkpoint.</strong><br>Task <code>' +
-            escapeHtml(selectedTaskId) +
-            '</code> is starting — the hub will show output here once the first step completes.</div>';
+            '<div class="empty">Could not load this checkpoint. Try another selection or wait and refresh.</div>';
           return;
         }
-        taskBody.innerHTML =
-          '<div class="empty">Could not load this checkpoint. Try another selection or wait and refresh.</div>';
-        return;
-      }
-      const cp = checkpointDetail;
-      const steps = (cp.results || []).map((r, i) => `
+        const cp = checkpointDetail;
+        const steps = (cp.results || []).map((r, i) => `
         <div class="step-card">
           <h3>${escapeHtml(r.stepId)}</h3>
           <div class="sub">node ${escapeHtml(r.nodeId)} · ${r.latencyMs} ms</div>
           <div class="md-content step-output-md">${renderMarkdown(r.output)}</div>
         </div>
       `).join('');
-      const summaryMd = renderMarkdown(cp.summary);
-      taskBody.innerHTML = `
+        const summaryMd = renderMarkdown(cp.summary);
+        taskBody.innerHTML = `
         <div class="task-meta">
           <span>task: <strong>${escapeHtml(cp.taskId)}</strong></span>
           <span>preset: ${escapeHtml(cp.preset)}</span>
@@ -1106,6 +1350,9 @@
         </div>
         ${steps ? `<div class="steps-label">Step outputs</div>${steps}` : '<div class="empty" style="padding:2rem 0">No step results in this checkpoint.</div>'}
       `;
+      } finally {
+        refreshFollowUpPanel();
+      }
     }
 
     async function poll() {

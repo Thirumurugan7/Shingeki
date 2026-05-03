@@ -13,7 +13,11 @@
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test src/genome/evaluate.test.ts src/genome/mutation.test.ts src/coordination/protocol.test.ts src/coordination/hub.integration.test.ts src/orchestrator/resume.test.ts src/orchestrator/orchestrator.test.ts src/orchestrator/planner.test.ts src/infra/checkpoint.test.ts src/infra/lineage-store.test.ts",
     "verify:viewer": "node scripts/verify-viewer.mjs",
-    "e2e:viewer": "node scripts/e2e-viewer-task.mjs"
+    "e2e:viewer": "node scripts/e2e-viewer-task.mjs",
+    "test:e2e": "playwright test -g smoke",
+    "test:e2e:live": "PLAYWRIGHT_LIVE=1 playwright test -g 'e2e:'",
+    "test:e2e:all": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@0gfoundation/0g-ts-sdk": "^1.2.8",
@@ -23,6 +27,7 @@
     "yaml": "^2.6.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "@types/node": "^20.11.0",
     "@types/ws": "^8.5.13",
     "tsx": "^4.7.0",

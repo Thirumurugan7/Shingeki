@@ -17,7 +17,7 @@ export interface DemoCheckpoint {
   results: StepResult[];
   genome: Genome;
   evolveThreshold: number;
-  summary: string;
+  summary?: string;
   updatedAt: number;
 }
 
@@ -60,7 +60,7 @@ export function listCheckpointSummaries(dir: string): CheckpointSummary[] {
       stepCount: cp.results.length,
       nextStepIndex: cp.nextStepIndex,
       mesh: cp.mesh,
-      summaryPreview: cp.summary.replace(/\s+/g, ' ').trim().slice(0, 220),
+      summaryPreview: (cp.summary ?? '').replace(/\s+/g, ' ').trim().slice(0, 220),
     });
   }
   return out.sort((a, b) => b.updatedAt - a.updatedAt);

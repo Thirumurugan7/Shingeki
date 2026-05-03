@@ -1,13 +1,13 @@
 {
   "name": "shingeki",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Distributed cognitive mesh — multi-node LLM orchestration with genome evolution and on-chain verification via 0G",
   "license": "MIT",
   "author": "thirumurugan7",
   "repository": {
     "type": "git",
-    "url": "https://github.com/thirumurugan7/shingeki.git"
+    "url": "git+https://github.com/thirumurugan7/shingeki.git"
   },
   "bugs": {
     "url": "https://github.com/thirumurugan7/shingeki/issues"
@@ -57,7 +57,7 @@
     }
   },
   "bin": {
-    "shingeki": "./dist/cli.js"
+    "shingeki": "dist/cli.js"
   },
   "files": [
     "dist",

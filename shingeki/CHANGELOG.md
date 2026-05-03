@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.1] — 2026-05-03
+
+### Fixed
+- `listCheckpointSummaries` crashed with `TypeError: Cannot read properties of undefined (reading 'replace')` when a checkpoint was written without a `summary` field — guarded with `?? ''`
+- `DemoCheckpoint.summary` is now optional so user-constructed checkpoints don't require it
+
 ## [0.1.0] — 2026-05-03
 
 ### Added

@@ -26,7 +26,7 @@ export class NodeRuntime {
       `Follow the user instruction exactly; cite PREVIOUS OUTPUT when present.`,
     ].join('\n');
 
-    const r = await routerInfer(step.description, system, { max_tokens: 2048, temperature: 0.25 });
+    const r = await routerInfer(step.description, system, { max_tokens: 2048, temperature: 0.25, model: this.genome.model });
     return {
       stepId: step.id,
       nodeId: this.opts.nodeId,

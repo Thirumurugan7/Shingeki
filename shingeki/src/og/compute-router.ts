@@ -18,6 +18,8 @@ export interface InferOptions {
   max_tokens?: number;
   temperature?: number;
   verify_tee?: boolean;
+  /** Override the default model. Passed directly to the Router. */
+  model?: string;
 }
 
 export interface InferResult {
@@ -76,7 +78,7 @@ async function routerInferOnce(
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({
-        model: MODEL,
+        model: opt.model ?? MODEL,
         messages,
         max_tokens: opt.max_tokens ?? 512,
         temperature: opt.temperature ?? 0.3,

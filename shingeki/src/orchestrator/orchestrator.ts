@@ -1,5 +1,33 @@
 import type { Genome } from '../genome/schema.js';
 import type { EvaluationResult, LineageEntry, NodeCapability, Plan, Step, StepResult } from '../types.js';
+
+/**
+ * Analyse a plan and return the minimum node set required to cover all domains.
+ * Each unique domain gets at least 1 node; the first domain gets 2 if there's only one
+ * domain total (guarantees parallel competition on step 1).
+ * Each domain is capped at 2 — enough for parallel competition without spawning excess nodes.
+ *
+ * Example: [research, research, planning, planning] → { research: 2, planning: 2 }
+ */
+export function planToRequiredRoles(plan: Plan): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const step of plan.steps) {
+    const domain = step.domain ?? 'general';
+    counts[domain] = (counts[domain] ?? 0) + 1;
+  }
+  // Cap each domain at 2.
+  const result: Record<string, number> = {};
+  for (const [d, n] of Object.entries(counts)) {
+    result[d] = Math.min(n, 2);
+  }
+  // Ensure at least 2 nodes total so parallel competition is always possible.
+  const total = Object.values(result).reduce((a, b) => a + b, 0);
+  if (total < 2) {
+    const first = Object.keys(result)[0] ?? 'general';
+    result[first] = 2;
+  }
+  return result;
+}
 import { heuristicScore, evaluateOutput } from '../genome/evaluate.js';
 import { applyMutation } from '../genome/mutation.js';
 import { formatMeshViz } from '../mesh/viz.js';

@@ -24,6 +24,8 @@ import {
   planJapanTrip,
   planResearchAnalyzeDecide,
 } from './planner/research-plan.js';
+import { splitCompoundTask } from './orchestrator/planner.js';
+import { planToRequiredRoles } from './orchestrator/orchestrator.js';
 import { appendTraceWithRetry } from './og/log.js';
 import { checkDemoEnv, printEnvReport } from './config/env-check.js';
 import {
@@ -57,12 +59,14 @@ function parseDemoArgs(argv: string[]): {
   preset: 'gpu' | 'japan';
   resumeTaskId?: string;
   taskIdArg?: string;
+  taskArg?: string;
   rest: string[];
 } {
   let mesh = false;
   let preset: 'gpu' | 'japan' = 'gpu';
   let resumeTaskId: string | undefined;
   let taskIdArg: string | undefined;
+  let taskArg: string | undefined;
   const out: string[] = [];
   let i = 0;
   while (i < argv.length) {
@@ -78,10 +82,13 @@ function parseDemoArgs(argv: string[]): {
     } else if (a === '--task-id' && argv[i + 1]) {
       taskIdArg = argv[i + 1]!;
       i += 1;
+    } else if (a === '--task' && argv[i + 1]) {
+      taskArg = argv[i + 1]!;
+      i += 1;
     } else out.push(a);
     i += 1;
   }
-  return { mesh, preset, resumeTaskId, taskIdArg, rest: out };
+  return { mesh, preset, resumeTaskId, taskIdArg, taskArg, rest: out };
 }
 
 function buildPlan(taskId: string, preset: 'gpu' | 'japan'): Plan {
@@ -142,7 +149,7 @@ async function verifyStepOnChain(
 
 async function cmdDemo() {
   const argv = process.argv.slice(3);
-  const { mesh, preset, resumeTaskId, taskIdArg, rest } = parseDemoArgs(argv);
+  const { mesh, preset, resumeTaskId, taskIdArg, taskArg, rest } = parseDemoArgs(argv);
   const taskOverride = rest.join(' ').trim();
 
   const envReport = checkDemoEnv();
@@ -173,8 +180,8 @@ async function cmdDemo() {
     process.exit(1);
   }
 
-  const plan = buildPlan(taskId, preset);
-  const summary = cp?.summary ?? (taskOverride || taskSummary(preset));
+  const plan = taskArg ? splitCompoundTask(taskId, taskArg) : buildPlan(taskId, preset);
+  const summary = cp?.summary ?? (taskArg ?? (taskOverride || taskSummary(preset)));
   const evolveThreshold = cp?.evolveThreshold ?? Number(process.env.SHINGEKI_EVOLVE_THRESHOLD ?? '0.55');
 
   const rollingResults: StepResult[] = cp ? [...cp.results] : [];
@@ -204,12 +211,27 @@ async function cmdDemo() {
   }
   console.log();
 
-  const nodes: NodeCapability[] = [
-    { id: 'node-1', capabilities: ['llm', 'executor'], specialization: ['research'], latencyMs: 120, stake: 10 },
-    { id: 'node-2', capabilities: ['llm', 'critic'],   specialization: ['planning'], latencyMs: 200, stake: 10 },
-  ];
-
   const log = (line: string) => console.log(line);
+
+  // Derive node pool from the plan's domain requirements — self-organizing local mesh.
+  const requiredRoles = planToRequiredRoles(plan);
+  const nodes: NodeCapability[] = [];
+  let nodeSeq = 1;
+  for (const [domain, count] of Object.entries(requiredRoles)) {
+    for (let ni = 0; ni < count; ni++) {
+      nodes.push({
+        id: `node-${nodeSeq++}`,
+        capabilities: ['llm', domain],
+        specialization: domain === 'general' ? [] : [domain],
+        latencyMs: 100 + nodeSeq * 20,
+        stake: 10,
+      });
+    }
+  }
+  const rolesSummary = Object.entries(requiredRoles)
+    .map(([r, n]) => `${n} ${r} specialist${n > 1 ? 's' : ''}`)
+    .join(', ');
+  log(`Shingeki spawned ${nodes.length} nodes: ${rolesSummary}`);
 
   const pk = process.env.PRIVATE_KEY;
   const wallet = pk
@@ -429,6 +451,7 @@ async function main() {
     console.log(`  demo --preset japan          Japan trip planning`);
     console.log(`  demo --mesh                  hub + workers (same + lineage viewer)`);
     console.log(`  demo --resume task-…         continue after crash`);
+    console.log(`  demo --task "…"              free-form task (auto-splits, infers domains)`);
     console.log(`  hub                          start hub + open genome lineage viewer`);
     console.log(`  node                         start worker (NODE_ID, NODE_ROLE, NODE_SPECIALIZATION)`);
     process.exit(1);

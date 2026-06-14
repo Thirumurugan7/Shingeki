@@ -1,32 +1,37 @@
-# 進撃 Shingeki
+# Sigli
 
-> Agents that always move forward.
+> Financial controls for AI agents.
 
-[![npm version](https://img.shields.io/npm/v/shingeki)](https://www.npmjs.com/package/shingeki)
-[![license](https://img.shields.io/npm/l/shingeki)](./LICENSE)
-[![node](https://img.shields.io/node/v/shingeki)](https://nodejs.org)
+[![npm version](https://img.shields.io/npm/v/sigli)](https://www.npmjs.com/package/sigli)
+[![license](https://img.shields.io/npm/l/sigli)](./LICENSE)
+[![node](https://img.shields.io/node/v/sigli)](https://nodejs.org)
 
-> **Status: alpha (0.1.x).** APIs may change between minor versions. Pin to an exact version for production use.
+> **Status: alpha (0.2.x).** APIs may change between minor versions. Pin to an exact version for production use.
 
-Shingeki is a distributed cognitive mesh where multiple AI agent nodes collaborate to solve multi-step tasks, with every decision verifiable on-chain. Unlike single-agent frameworks that run one LLM call after another, Shingeki routes steps across a live network of nodes that compete on quality, evolve their genome when output falls below threshold, and log every trace to 0G's tamper-proof storage — so any participant can independently verify what ran, on what model, and with what result.
+Sigli gives every agent a wallet, a policy, and an audit trail, so your institution can deploy autonomous AI without losing financial control. Expense policies, approval chains, and audit logs were all built assuming a person made the decision — when software acts autonomously, those controls no longer apply. Sigli closes that gap: every agent gets a named **identity**, a **scoped wallet** that cannot overdraw, a **policy enforced at the moment of action** (not reviewed after), and an **audit trail** that records which agent, which task, which policy check, and which outcome.
+
+Underneath, Sigli runs on a distributed cognitive mesh: agent nodes collaborate on multi-step tasks, compete on quality, evolve their genome when output falls below threshold, and log every trace to 0G's tamper-proof storage. The control plane is the financial layer on top of that execution engine — so autonomous workflows that need to spend money (API calls, SaaS renewals, vendor payments, swaps) are safe to run in production.
+
+Built for banks, insurers, asset managers, and enterprise AI teams.
 
 ---
 
-## Why Shingeki
+## Why Sigli
 
-| Framework | Architecture | Evolution | Verified |
-|-----------|-------------|-----------|----------|
-| LangChain | Single chain, single node | Static prompts | No |
-| AutoGen | Agent pairs, static roles | Static | No |
-| CrewAI | Fixed crew, sequential | Static | No |
-| **Shingeki** | **Distributed mesh** | **Genome-driven (live TEE scoring)** | **TEE ✓ + 0G Log Store** |
+| | Built-in controls | Spend governance | Verified execution |
+|---|---|---|---|
+| LangChain / AutoGen / CrewAI | None — orchestration only | None | No |
+| Generic agent frameworks | Monitoring after the fact | Logged, not enforced | No |
+| **Sigli** | **Identity + scoped wallet + policy + audit** | **Enforced at the moment of action** | **TEE ✓ + 0G Log Store** |
+
+The difference between "we monitor our agents" and "our agents cannot violate financial policy by design" is the difference between a tool and infrastructure.
 
 ---
 
 ## Installation
 
 ```bash
-npm install shingeki
+npm install sigli
 ```
 
 **Requirements:**
@@ -47,17 +52,113 @@ ROUTER_API_KEY=sk-your-key-here
 ### 2. Run the built-in demo (no code needed)
 
 ```bash
-npx shingeki demo                        # GPU research preset
-npx shingeki demo --preset japan         # 5-day Japan trip planner
-npx shingeki demo --preset defi          # DeFi swap analysis (needs UNISWAP_API_KEY)
-npx shingeki demo --resume task-<id>     # resume after crash
+npx sigli demo                        # GPU research preset
+npx sigli demo --preset japan         # 5-day Japan trip planner
+npx sigli demo --preset defi          # DeFi swap analysis (needs UNISWAP_API_KEY)
+npx sigli demo --resume task-<id>     # resume after crash
 ```
 
 ### 3. Run with your own task
 
 ```bash
-npx shingeki run --task "Compare the top 3 L2 networks for a DeFi app launch"
+npx sigli run --task "Compare the top 3 L2 networks for a DeFi app launch"
 ```
+
+---
+
+## Financial controls
+
+One control plane for every agent your institution deploys. Up and running in three steps — and every decision is enforced in-process, before any transaction clears.
+
+```ts
+import { ControlPlane } from 'sigli/controls';
+
+const plane = new ControlPlane({ currency: 'USD' });
+```
+
+### 1. Register your agent
+
+Every agent gets a unique identity tied to its owner, purpose, and lifecycle status — a named, accountable actor, not a shared service account. Registering opens a scoped wallet for it.
+
+```ts
+// ≈ POST /agents
+plane.registerAgent(
+  { id: 'procurement-01', name: 'Procurement', owner: 'finance-team', purpose: 'vendor payments' },
+  1000, // opening wallet balance
+);
+```
+
+### 2. Set its financial policy
+
+Define exactly what the agent is allowed to do: a per-action spend limit, a velocity cap over a rolling window, approved counterparties, and an escalation threshold above which a human must approve. Policy is enforced at runtime, not logged after.
+
+```ts
+// ≈ POST /agents/procurement-01/policy
+plane.setPolicy('procurement-01', {
+  spend_limit: 500,
+  velocity: 'daily',
+  velocity_cap: 500,        // defaults to spend_limit when omitted
+  escalate_above: 250,
+  approved_counterparties: ['acme-supplies', 'aws'],
+});
+```
+
+### 3. Authorize spend — APPROVED, ESCALATED, or BLOCKED
+
+`authorize()` is the hot path: it evaluates the request against the policy, debits the wallet **only on approval**, and records the outcome to the audit trail.
+
+```ts
+plane.authorize({ agentId: 'procurement-01', amount: 248, counterparty: 'acme-supplies', task: 'invoice #4821' });
+// → { outcome: 'APPROVED',  rule: 'policy-ok' }            wallet: 1000 → 752
+
+plane.authorize({ agentId: 'procurement-01', amount: 260, counterparty: 'aws', task: 'reserved capacity' });
+// → { outcome: 'ESCALATED', rule: 'escalation-threshold' } wallet unchanged — human approval required
+
+plane.authorize({ agentId: 'procurement-01', amount: 1200, counterparty: 'acme-supplies', task: 'bulk order' });
+// → { outcome: 'BLOCKED',   rule: 'spend-limit' }          wallet unchanged
+```
+
+Decisions are deterministic. Hard limits (invalid amount, counterparty allow-list, spend limit, velocity cap, insufficient funds) block first; the escalation threshold is checked only on an otherwise-approvable spend.
+
+### 4. Get a full audit trail
+
+Every action is recorded with full context: agent, task, policy check, approval chain, outcome. Reviewable by internal audit, legal, and regulators — and exportable as JSON or CSV.
+
+```ts
+// ≈ GET /agents/procurement-01/audit
+plane.auditSummary('procurement-01');
+// → { actions: 3, approved: 1, escalated: 1, violations: 1 }
+
+const csv = plane.exportAuditCSV('procurement-01');
+```
+
+### Durable persistence
+
+Pass `persistDir` and the full plane (agents, policies, wallets, audit) is written atomically after every mutation, and reloads with state and the monotonic audit sequence intact.
+
+```ts
+const plane = new ControlPlane({ currency: 'USD', persistDir: '.sigli' });
+// ...later, in another process:
+const restored = ControlPlane.load('.sigli');
+```
+
+### Govern an agent's spend inside the mesh
+
+Bind a `NodeRuntime` to the control plane and the agent's financial tool calls are authorized — and audited — before they execute. A blocked or escalated action is never carried out.
+
+```ts
+import { NodeRuntime } from 'sigli';
+
+const runtime = new NodeRuntime(
+  { nodeId: 'node-1' },
+  genome,
+  { plane, agentId: 'procurement-01' },
+);
+// When the LLM emits {"tool":"spend","amountUsd":120,"counterparty":"aws","memo":"..."}
+// the runtime routes it through plane.authorize() and annotates the step output with the decision.
+```
+
+> **Money handling.** Balances are held internally as integer minor units (cents), so spend checks and ledger math are exact — never binary floats. Amounts in the public API are in the wallet's major units (e.g. USD).
 
 ---
 
@@ -71,7 +172,7 @@ import {
   MeshOrchestrator,
   NodeRuntime,
   planResearchAnalyzeDecide,
-} from 'shingeki';
+} from 'sigli';
 
 const genome = {
   id: 'g1',
@@ -111,7 +212,7 @@ console.log(results.at(-1)?.output);
 ### Load genome from YAML config
 
 ```ts
-import { genomeFromConfig } from 'shingeki';
+import { genomeFromConfig } from 'sigli';
 import { parse } from 'yaml';
 import { readFileSync } from 'node:fs';
 
@@ -146,13 +247,13 @@ import {
   GPU_LLM_RESEARCH_GOAL,
   JAPAN_TRIP_GOAL,
   DEFI_SWAP_GOAL,
-} from 'shingeki';
+} from 'sigli';
 ```
 
 ### Split a free-form task into a plan
 
 ```ts
-import { splitCompoundTask } from 'shingeki';
+import { splitCompoundTask } from 'sigli';
 
 const plan = splitCompoundTask(
   'task-001',
@@ -165,7 +266,7 @@ const plan = splitCompoundTask(
 ### Genome evolution — manual control
 
 ```ts
-import { evaluateOutput, applyMutation } from 'shingeki';
+import { evaluateOutput, applyMutation } from 'sigli';
 
 const result = await evaluateOutput(stepOutput, taskContext, 0.55);
 // result.path === 'heuristic' | 'llm'
@@ -183,7 +284,7 @@ if (result.score < 0.55) {
 The Uniswap tool is activated automatically when `genome.tools` includes `'uniswap'` and the LLM embeds a tool call in its response. You can also call it directly:
 
 ```ts
-import { getUniswapQuote, buildUniswapSwap, checkUniswapApproval } from 'shingeki';
+import { getUniswapQuote, buildUniswapSwap, checkUniswapApproval } from 'sigli';
 
 // UNISWAP_API_KEY must be set
 const quote = await getUniswapQuote({
@@ -237,7 +338,7 @@ import {
   readCheckpoint,
   listCheckpointSummaries,
   buildPriorContextFromResults,
-} from 'shingeki';
+} from 'sigli';
 
 // List all saved tasks
 const summaries = await listCheckpointSummaries('.checkpoints');
@@ -259,7 +360,7 @@ Run workers across multiple machines — each registers specializations and the 
 ### Start the hub (machine 1)
 
 ```bash
-SHINGEKI_HUB_TOKEN=my-secret npx shingeki hub
+SIGLI_HUB_TOKEN=my-secret npx sigli hub
 # Opens lineage viewer at http://localhost:8765/viewer
 ```
 
@@ -268,23 +369,23 @@ SHINGEKI_HUB_TOKEN=my-secret npx shingeki hub
 ```bash
 # Worker A — research specialist
 NODE_ID=node-1 NODE_ROLE=executor NODE_SPECIALIZATION=research \
-  SHINGEKI_HUB_URL=ws://hub-host:8765 \
-  SHINGEKI_HUB_TOKEN=my-secret \
-  npx shingeki node
+  SIGLI_HUB_URL=ws://hub-host:8765 \
+  SIGLI_HUB_TOKEN=my-secret \
+  npx sigli node
 
 # Worker B — planning specialist
 NODE_ID=node-2 NODE_ROLE=reasoning NODE_SPECIALIZATION=planning \
-  SHINGEKI_HUB_URL=ws://hub-host:8765 \
-  SHINGEKI_HUB_TOKEN=my-secret \
-  npx shingeki node
+  SIGLI_HUB_URL=ws://hub-host:8765 \
+  SIGLI_HUB_TOKEN=my-secret \
+  npx sigli node
 ```
 
 ### Run a task against the mesh (machine 4)
 
 ```bash
-SHINGEKI_HUB_URL=ws://hub-host:8765 \
-  SHINGEKI_HUB_TOKEN=my-secret \
-  npx shingeki demo --mesh
+SIGLI_HUB_URL=ws://hub-host:8765 \
+  SIGLI_HUB_TOKEN=my-secret \
+  npx sigli demo --mesh
 ```
 
 ### Programmatic distributed execution
@@ -295,9 +396,9 @@ import {
   createMeshStepExecutor,
   hubUrlFromEnv,
   MeshOrchestrator,
-} from 'shingeki';
+} from 'sigli';
 
-const ws = await openOrchestratorSession(hubUrlFromEnv(), process.env.SHINGEKI_HUB_TOKEN);
+const ws = await openOrchestratorSession(hubUrlFromEnv(), process.env.SIGLI_HUB_TOKEN);
 const executor = createMeshStepExecutor(ws);
 
 const orch = new MeshOrchestrator(nodes);
@@ -327,24 +428,24 @@ Replace the WebSocket hub with broker-free peer-to-peer transport via a Gensyn A
 
 ```bash
 # Enable on hub
-AXL_ENABLED=true npx shingeki hub
+AXL_ENABLED=true npx sigli hub
 
 # Enable on worker (needs the hub's peer ID)
-AXL_ENABLED=true AXL_HUB_PEER_ID=<hub-peer-id> npx shingeki node
+AXL_ENABLED=true AXL_HUB_PEER_ID=<hub-peer-id> npx sigli node
 
 # Enable on orchestrator
-AXL_ENABLED=true AXL_WORKER_PEER_IDS=<id1,id2> npx shingeki demo --mesh
+AXL_ENABLED=true AXL_WORKER_PEER_IDS=<id1,id2> npx sigli demo --mesh
 ```
 
 ```ts
-import { createAxlTransport, runAxlWorkerHost, runAxlOrchestratorSession } from 'shingeki';
+import { createAxlTransport, runAxlWorkerHost, runAxlOrchestratorSession } from 'sigli';
 
 const axl = createAxlTransport('http://127.0.0.1:9002');
 const identity = await axl.getIdentity();
 console.log(identity.peerId); // share this with workers
 ```
 
-See [`axl/README.md`](https://github.com/thirumurugan7/shingeki/blob/main/axl/README.md) for the full sidecar setup.
+See [`axl/README.md`](https://github.com/thirumurugan7/sigli/blob/main/axl/README.md) for the full sidecar setup.
 
 ---
 
@@ -374,6 +475,10 @@ Without `PRIVATE_KEY`, all LLM calls still run through the 0G Router with TEE ve
 
 ## Environment variables
 
+> **Rename note.** The documented prefix is now `SIGLI_`. Existing `SHINGEKI_*`
+> variables still work — Sigli mirrors the two prefixes in both directions at
+> startup, and whichever you set wins. New deployments should use `SIGLI_`.
+
 | Variable | Default | Description |
 |---|---|---|
 | `ROUTER_API_KEY` | — | **Required.** From [pc.0g.ai](https://pc.0g.ai) → API Keys |
@@ -383,13 +488,13 @@ Without `PRIVATE_KEY`, all LLM calls still run through the 0G Router with TEE ve
 | `INDEXER_RPC` | — | 0G indexer URL (required with `PRIVATE_KEY`) |
 | `FLOW_CONTRACT` | — | 0G Flow contract address |
 | `KV_NODE_URL` | — | 0G KV node endpoint |
-| `SHINGEKI_EVOLVE_THRESHOLD` | `0.55` | Fitness score below this triggers genome mutation |
-| `SHINGEKI_HUB_PORT` | `8765` | Hub WebSocket + HTTP port |
-| `SHINGEKI_HUB_HOST` | `0.0.0.0` | Hub bind address |
-| `SHINGEKI_HUB_TOKEN` | — | Shared secret — **required when `NODE_ENV=production`** |
-| `SHINGEKI_HUB_URL` | `ws://localhost:8765` | Hub URL for workers / orchestrators |
-| `SHINGEKI_AGENTMESH_CONFIG` | `agentmesh.example.yaml` | Path to custom genome YAML |
-| `SHINGEKI_CHECKPOINT_DIR` | `.checkpoints/` | Directory for crash-recovery checkpoints |
+| `SIGLI_EVOLVE_THRESHOLD` | `0.55` | Fitness score below this triggers genome mutation |
+| `SIGLI_HUB_PORT` | `8765` | Hub WebSocket + HTTP port |
+| `SIGLI_HUB_HOST` | `0.0.0.0` | Hub bind address |
+| `SIGLI_HUB_TOKEN` | — | Shared secret — **required when `NODE_ENV=production`** |
+| `SIGLI_HUB_URL` | `ws://localhost:8765` | Hub URL for workers / orchestrators |
+| `SIGLI_AGENTMESH_CONFIG` | `agentmesh.example.yaml` | Path to custom genome YAML |
+| `SIGLI_CHECKPOINT_DIR` | `.checkpoints/` | Directory for crash-recovery checkpoints |
 | `NODE_ID` | random UUID | Worker node identity |
 | `NODE_ROLE` | `general` | `executor` \| `critic` \| `reasoning` \| `memory` \| `general` |
 | `NODE_SPECIALIZATION` | — | Comma-separated: `research,planning,coding,defi` |
@@ -413,15 +518,38 @@ import {
   MeshOrchestrator,      // core — runs a Plan across nodes
   planToRequiredRoles,   // infer how many nodes a Plan needs
   splitCompoundTask,     // split a free-form string into a Plan
-} from 'shingeki';
+} from 'sigli';
 ```
 
 ### Node runtime
 
 ```ts
-import { NodeRuntime } from 'shingeki';
+import { NodeRuntime } from 'sigli';
 // NodeRuntime({ nodeId }, genome).executeStep(step) → StepResult
+// NodeRuntime({ nodeId }, genome, { plane, agentId }) → spend governed by the control plane
 ```
+
+### Financial controls
+
+```ts
+import {
+  ControlPlane,     // identity + wallet + policy + audit, one object
+  AgentRegistry,    // agent identities (used internally by ControlPlane)
+  AgentWallet,      // scoped, non-overdrawing ledger (integer minor units)
+  AuditLog,         // append-only trail with JSON/CSV export
+  evaluatePolicy,   // pure policy engine → PolicyDecision
+} from 'sigli/controls'; // also re-exported from 'sigli'
+
+import type {
+  AgentIdentity, AgentStatus, RegisterAgentInput,
+  PolicyDefinition, Velocity, ActionRequest,
+  PolicyDecision, Outcome, AuditEntry, AuditSummary,
+} from 'sigli/controls';
+```
+
+`ControlPlane` methods: `registerAgent`, `setAgentStatus`, `listAgents`, `getAgent`,
+`setPolicy`, `getPolicy`, `fundWallet`, `walletOf`, `authorize`, `audit`,
+`auditSummary`, `exportAuditJSON`, `exportAuditCSV`, and the static `ControlPlane.load(dir)`.
 
 ### Genome
 
@@ -432,7 +560,7 @@ import {
   heuristicScore,   // synchronous fast path only
   applyMutation,    // mutate one axis → new Genome
   mutateGenome,     // returns all three variant candidates
-} from 'shingeki';
+} from 'sigli';
 ```
 
 ### Coordination (WebSocket mesh)
@@ -443,8 +571,8 @@ import {
   runWorkerHost,              // worker with auto-reconnect
   openOrchestratorSession,    // open WS session as orchestrator
   createMeshStepExecutor,     // step executor over existing WS
-  hubUrlFromEnv,              // reads SHINGEKI_HUB_URL
-} from 'shingeki';
+  hubUrlFromEnv,              // reads SIGLI_HUB_URL
+} from 'sigli';
 ```
 
 ### Coordination (AXL P2P)
@@ -456,7 +584,7 @@ import {
   runAxlWorkerHost,
   runAxlOrchestratorSession,
   createAxlStepExecutor,
-} from 'shingeki';
+} from 'sigli';
 ```
 
 ### Uniswap tools
@@ -466,7 +594,7 @@ import {
   getUniswapQuote,       // POST /v1/quote
   buildUniswapSwap,      // POST /v1/swap → calldata
   checkUniswapApproval,  // POST /v1/check_approval
-} from 'shingeki';
+} from 'sigli';
 ```
 
 ### Plans / presets
@@ -479,7 +607,7 @@ import {
   GPU_LLM_RESEARCH_GOAL,
   JAPAN_TRIP_GOAL,
   DEFI_SWAP_GOAL,
-} from 'shingeki';
+} from 'sigli';
 ```
 
 ### Infra
@@ -491,7 +619,7 @@ import {
   listCheckpointSummaries,
   buildPriorContextFromResults,
   createLogger,
-} from 'shingeki';
+} from 'sigli';
 ```
 
 ### Types
@@ -507,7 +635,7 @@ import type {
   MeshMessage,
   EvaluationResult,
   LineageEntry,
-} from 'shingeki';
+} from 'sigli';
 ```
 
 ---
@@ -515,10 +643,10 @@ import type {
 ## CLI reference
 
 ```
-shingeki demo [options]         Run a task locally with in-process nodes
-shingeki run  [options]         Run a task (local or mesh)
-shingeki hub  [options]         Start the coordination hub + viewer
-shingeki node [options]         Start a worker node
+sigli demo [options]         Run a task locally with in-process nodes
+sigli run  [options]         Run a task (local or mesh)
+sigli hub  [options]         Start the coordination hub + viewer
+sigli node [options]         Start a worker node
 
 Options (demo / run):
   --preset <gpu|japan|defi>     Use a built-in task preset
@@ -539,6 +667,7 @@ Options (node):
 
 ```
 src/
+├── controls/            Sigli control plane — identity, wallet, policy, audit
 ├── og/                  0G Router, Log Store, KV Store
 ├── genome/              Schema, two-path fitness scorer, mutation
 ├── orchestrator/        MeshOrchestrator, compound-task planner
@@ -547,7 +676,7 @@ src/
 ├── planner/             Built-in preset plans (GPU, Japan, DeFi)
 ├── tools/               Uniswap Trade API client
 ├── infra/               Checkpoints, lineage store, logger
-├── config/              Env var validation, pre-flight check
+├── config/              Env var validation, pre-flight check, rename shim
 ├── mesh/                ASCII mesh status renderer
 ├── viewer/              Self-contained browser lineage viewer
 └── cli.ts               CLI entry point

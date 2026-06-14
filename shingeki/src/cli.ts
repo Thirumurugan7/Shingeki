@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Shingeki CLI — run [--mesh] [--preset gpu|japan] | hub | node   (alias: demo)
+ * Sigli CLI — run [--mesh] [--preset gpu|japan] | hub | node   (alias: demo)
  */
+import './config/env-compat.js'; // mirror SIGLI_* ↔ SHINGEKI_* before any env read
 import { config } from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,7 +13,7 @@ import { ethers } from 'ethers';
 
 import { genomeFromConfig, type AgentMeshConfig, type Genome } from './genome/schema.js';
 import { MeshOrchestrator } from './orchestrator/orchestrator.js';
-import { loadKvEnv, ShingekiKv } from './og/kv.js';
+import { loadKvEnv, SigliKv } from './og/kv.js';
 import { MeshHub } from './coordination/ws-hub.js';
 import { runWorkerHost } from './coordination/worker-host.js';
 import { createMeshStepExecutor, hubUrlFromEnv, openOrchestratorSession } from './coordination/mesh-orchestrator-ws.js';
@@ -222,7 +223,7 @@ async function cmdRun() {
     writeCheckpointAtomic(checkpointDir, payload);
   };
 
-  console.log('─── Shingeki run ───');
+  console.log('─── Sigli run ───');
   console.log('Goal:', summary.split('\n').map(l => l.trim()).join(' '));
   console.log('Preset:', preset, mesh ? '| mesh (hub + workers)' : '| local (in-process nodes)');
   console.log(`Evolution threshold (score < → mutate): ${evolveThreshold}`);
@@ -253,7 +254,7 @@ async function cmdRun() {
   const rolesSummary = Object.entries(requiredRoles)
     .map(([r, n]) => `${n} ${r} specialist${n > 1 ? 's' : ''}`)
     .join(', ');
-  log(`Shingeki spawned ${nodes.length} nodes: ${rolesSummary}`);
+  log(`Sigli spawned ${nodes.length} nodes: ${rolesSummary}`);
 
   const pk = process.env.PRIVATE_KEY;
   const wallet = pk
@@ -397,7 +398,7 @@ async function finalize(results: StepResult[], genome: Genome, taskId: string) {
   if (pk) {
     try {
       const wallet = new ethers.Wallet(pk, new ethers.JsonRpcProvider(loadKvEnv().rpcUrl));
-      const kv = new ShingekiKv(wallet, loadKvEnv());
+      const kv = new SigliKv(wallet, loadKvEnv());
       const ver = Date.now();
       await kv.setJson(`mesh:genome:${taskId}`, { genomeId: genome.id, taskId, stepCount: results.length }, ver);
       console.log('\n[0G KV] genome checkpoint written version', ver);
@@ -432,7 +433,7 @@ async function cmdHub() {
   const h = tls ? 'https' : 'http';
   const w = tls ? 'wss' : 'ws';
   const viewerUrl = `${h}://127.0.0.1:${port}/viewer`;
-  console.log(`Shingeki hub listening on ${w}://127.0.0.1:${port}`);
+  console.log(`Sigli hub listening on ${w}://127.0.0.1:${port}`);
   console.log(
     `${h}://127.0.0.1:${port}/health   /ready   /metrics   /status   /lineage   /checkpoints   /checkpoint   POST /api/run`,
   );

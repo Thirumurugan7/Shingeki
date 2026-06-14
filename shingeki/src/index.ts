@@ -1,12 +1,18 @@
 /**
- * Shingeki public API — programmatic entry point.
+ * Sigli public API — programmatic entry point.
+ *
+ * Sigli gives every agent a wallet, a policy, and an audit trail, layered on a
+ * distributed mesh that executes and verifies each step.
  *
  * @example
  * ```ts
- * import { MeshOrchestrator, NodeRuntime, planResearchAnalyzeDecide } from 'shingeki';
- * import { genomeFromConfig } from 'shingeki/genome';
+ * import { ControlPlane, MeshOrchestrator, NodeRuntime } from 'sigli';
+ * import { evaluatePolicy } from 'sigli/controls';
  * ```
  */
+
+// Mirror SIGLI_* ↔ SHINGEKI_* env vars before anything reads them.
+import './config/env-compat.js';
 
 // Orchestrator
 export { MeshOrchestrator, planToRequiredRoles } from './orchestrator/orchestrator.js';
@@ -15,7 +21,37 @@ export { splitCompoundTask } from './orchestrator/planner.js';
 
 // Node runtime
 export { NodeRuntime } from './node-runtime/runtime.js';
-export type { NodeRuntimeOptions } from './node-runtime/runtime.js';
+export type { NodeRuntimeOptions, NodeControls } from './node-runtime/runtime.js';
+
+// Sigli financial-controls layer
+export {
+  ControlPlane,
+  CONTROL_PLANE_VERSION,
+  AgentRegistry,
+  AgentWallet,
+  AuditLog,
+  evaluatePolicy,
+  VELOCITY_WINDOW_MS,
+  toMinor,
+  toMajor,
+  round2,
+} from './controls/index.js';
+export type {
+  ControlPlaneOptions,
+  WalletState,
+  WalletOptions,
+  PolicyContext,
+  AgentIdentity,
+  AgentStatus,
+  RegisterAgentInput,
+  Velocity,
+  PolicyDefinition,
+  Outcome,
+  ActionRequest,
+  PolicyDecision,
+  AuditEntry,
+  AuditSummary,
+} from './controls/index.js';
 
 // Coordination hub + WebSocket layer
 export { MeshHub } from './coordination/ws-hub.js';

@@ -22,7 +22,7 @@ export function loadKvEnv(): KvEnv {
   };
 }
 
-export class ShingekiKv {
+export class SigliKv {
   readonly streamId: `0x${string}`;
 
   constructor(
@@ -59,3 +59,9 @@ export class ShingekiKv {
     return JSON.parse(text) as T;
   }
 }
+
+/**
+ * @deprecated Renamed to {@link SigliKv}. Kept as an alias so existing imports
+ * (and the on-chain stream label) continue to work after the rebrand.
+ */
+export const ShingekiKv = SigliKv;

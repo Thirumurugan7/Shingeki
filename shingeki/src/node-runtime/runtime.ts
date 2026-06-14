@@ -2,9 +2,22 @@ import type { Genome } from '../genome/schema.js';
 import type { Step, StepResult } from '../types.js';
 import { routerInfer } from '../og/compute-router.js';
 import { getUniswapQuote } from '../tools/uniswap.js';
+import type { ControlPlane } from '../controls/control-plane.js';
 
 export interface NodeRuntimeOptions {
   nodeId: string;
+}
+
+/**
+ * Binds a NodeRuntime to a Sigli control plane. When present, every financial
+ * tool call the agent emits is authorized against the agent's policy — and
+ * logged to the audit trail — before it executes. Blocked or escalated actions
+ * are not carried out.
+ */
+export interface NodeControls {
+  plane: ControlPlane;
+  /** Identity this runtime acts as; must be registered in the control plane. */
+  agentId: string;
 }
 
 /** Worker — executes one planned step using Router-backed LLM (0G Compute path). */
@@ -12,6 +25,7 @@ export class NodeRuntime {
   constructor(
     private readonly opts: NodeRuntimeOptions,
     private readonly genome: Genome,
+    private readonly controls?: NodeControls,
   ) {}
 
   /**
@@ -20,7 +34,7 @@ export class NodeRuntime {
   async executeStep(step: Step, _priorContext?: string): Promise<StepResult> {
     const role = step.role ?? 'worker';
     const systemParts = [
-      `You are node ${this.opts.nodeId} in the Shingeki mesh (${role}).`,
+      `You are node ${this.opts.nodeId} in the Sigli mesh (${role}).`,
       `Strategy: ${this.genome.strategy}`,
       `Tools (declared): ${this.genome.tools.join(', ')}`,
       `Reflection depth: ${this.genome.reflection_depth}`,
@@ -33,12 +47,21 @@ export class NodeRuntime {
         'The orchestrator will execute it and return results.',
       );
     }
+    if (this.controls) {
+      systemParts.push(
+        'Financial actions are governed by Sigli. To request authorization for a spend, output a JSON block: ' +
+        '{"tool":"spend","amountUsd":<number>,"counterparty":"<name>","memo":"<why>"}. ' +
+        'The control plane will APPROVE, ESCALATE, or BLOCK it against your policy — do not assume a spend succeeded until it is approved.',
+      );
+    }
     const system = systemParts.join('\n');
 
     const r = await routerInfer(step.description, system, { max_tokens: 2048, temperature: 0.25, model: this.genome.model });
-    const output = this.genome.tools.includes('uniswap')
-      ? await executeUniswapToolCalls(r.text)
-      : r.text;
+
+    let output = r.text;
+    if (this.controls) output = await this.executeSpendToolCalls(output, step.id);
+    if (this.genome.tools.includes('uniswap')) output = await executeUniswapToolCalls(output, this.controls, step.id);
+
     return {
       stepId: step.id,
       nodeId: this.opts.nodeId,
@@ -47,10 +70,44 @@ export class NodeRuntime {
       teeTrace: r.trace,
     };
   }
+
+  /** Scans output for `spend` tool calls and runs each through the control plane. */
+  private async executeSpendToolCalls(text: string, task: string): Promise<string> {
+    const controls = this.controls!;
+    const matches = text.match(/\{[^{}]*"tool"\s*:\s*"spend"[^{}]*\}/g);
+    if (!matches) return text;
+    let result = text;
+    for (const match of matches) {
+      try {
+        const p = JSON.parse(match) as { amountUsd: number; counterparty?: string; memo?: string };
+        const decision = controls.plane.authorize({
+          agentId: controls.agentId,
+          amount: p.amountUsd,
+          counterparty: p.counterparty,
+          task: p.memo ?? task,
+        });
+        const summary =
+          `\n\n**Sigli decision:** ${decision.outcome} — ${decision.reason} ` +
+          `(rule: ${decision.rule}; agent: ${controls.agentId})`;
+        result = result.replace(match, match + summary);
+      } catch (e: unknown) {
+        result = result.replace(match, match + `\n\n**Sigli error:** ${(e as Error).message}`);
+      }
+    }
+    return result;
+  }
 }
 
-/** Scans LLM output for embedded uniswap_quote tool calls and executes them. */
-async function executeUniswapToolCalls(text: string): Promise<string> {
+/**
+ * Scans LLM output for embedded uniswap_quote tool calls and executes them.
+ * When a control plane is attached and the call carries `authorizeUsd`, the
+ * spend is authorized first; a non-APPROVED decision skips the quote.
+ */
+async function executeUniswapToolCalls(
+  text: string,
+  controls: NodeControls | undefined,
+  task?: string,
+): Promise<string> {
   const matches = text.match(/\{[^{}]*"tool"\s*:\s*"uniswap_quote"[^{}]*\}/g);
   if (!matches) return text;
   let result = text;
@@ -59,7 +116,25 @@ async function executeUniswapToolCalls(text: string): Promise<string> {
       const p = JSON.parse(match) as {
         tokenIn: string; tokenOut: string; amount: string;
         chainId: number; swapper?: string;
+        authorizeUsd?: number; counterparty?: string;
       };
+
+      if (controls && p.authorizeUsd != null) {
+        const decision = controls.plane.authorize({
+          agentId: controls.agentId,
+          amount: p.authorizeUsd,
+          counterparty: p.counterparty ?? 'uniswap',
+          task: task ?? 'uniswap swap',
+        });
+        if (decision.outcome !== 'APPROVED') {
+          result = result.replace(
+            match,
+            match + `\n\n**Sigli ${decision.outcome}:** ${decision.reason} — swap not executed.`,
+          );
+          continue;
+        }
+      }
+
       const quote = await getUniswapQuote({
         tokenIn: p.tokenIn, tokenOut: p.tokenOut, amount: p.amount,
         chainId: p.chainId,

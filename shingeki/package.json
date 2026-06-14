@@ -1,21 +1,26 @@
 {
-  "name": "shingeki",
-  "version": "0.1.1",
+  "name": "sigli",
+  "version": "0.2.0",
   "type": "module",
-  "description": "Distributed cognitive mesh — multi-node LLM orchestration with genome evolution and on-chain verification via 0G",
+  "description": "Financial controls for AI agents — give every agent an identity, a scoped wallet, a runtime-enforced policy, and an audit trail, on a distributed mesh verified via 0G",
   "license": "MIT",
   "author": "thirumurugan7",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/thirumurugan7/shingeki.git"
+    "url": "git+https://github.com/thirumurugan7/sigli.git"
   },
   "bugs": {
-    "url": "https://github.com/thirumurugan7/shingeki/issues"
+    "url": "https://github.com/thirumurugan7/sigli/issues"
   },
-  "homepage": "https://github.com/thirumurugan7/shingeki#readme",
+  "homepage": "https://github.com/thirumurugan7/sigli#readme",
   "keywords": [
-    "shingeki",
+    "sigli",
     "ai-agent",
+    "agent-wallet",
+    "policy-enforcement",
+    "audit-trail",
+    "financial-controls",
+    "agent-identity",
     "multi-agent",
     "orchestrator",
     "mesh",
@@ -24,7 +29,6 @@
     "router",
     "tee",
     "genome",
-    "evolution",
     "websocket",
     "uniswap",
     "defi",
@@ -38,6 +42,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./controls": {
+      "import": "./dist/controls/index.js",
+      "types": "./dist/controls/index.d.ts"
     },
     "./genome": {
       "import": "./dist/genome/schema.js",
@@ -57,7 +65,7 @@
     }
   },
   "bin": {
-    "shingeki": "dist/cli.js"
+    "sigli": "dist/cli.js"
   },
   "files": [
     "dist",
@@ -78,7 +86,7 @@
     "node": "node --import tsx src/cli.ts node",
     "start": "node --import tsx src/cli.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/genome/evaluate.test.ts src/genome/mutation.test.ts src/coordination/protocol.test.ts src/coordination/hub.integration.test.ts src/coordination/axl-transport.test.ts src/orchestrator/resume.test.ts src/orchestrator/orchestrator.test.ts src/orchestrator/planner.test.ts src/infra/checkpoint.test.ts src/infra/lineage-store.test.ts src/tools/uniswap.test.ts",
+    "test": "node --import tsx --test src/genome/evaluate.test.ts src/genome/mutation.test.ts src/controls/policy.test.ts src/controls/control-plane.test.ts src/coordination/protocol.test.ts src/coordination/hub.integration.test.ts src/coordination/axl-transport.test.ts src/orchestrator/resume.test.ts src/orchestrator/orchestrator.test.ts src/orchestrator/planner.test.ts src/infra/checkpoint.test.ts src/infra/lineage-store.test.ts src/tools/uniswap.test.ts",
     "verify:viewer": "node scripts/verify-viewer.mjs",
     "e2e:viewer": "node scripts/e2e-viewer-task.mjs",
     "test:e2e": "playwright test -g smoke",

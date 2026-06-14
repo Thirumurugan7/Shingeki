@@ -27,7 +27,7 @@ function emit(level: Level, msg: string, fields?: Record<string, unknown>) {
     ts: new Date().toISOString(),
     level,
     msg,
-    service: 'shingeki',
+    service: 'sigli',
     ...fields,
   };
   if (pretty) {
@@ -51,4 +51,4 @@ export function createLogger(component: string) {
   };
 }
 
-export const log = createLogger('shingeki');
+export const log = createLogger('sigli');

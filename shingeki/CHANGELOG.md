@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] — 2026-06-15
+
+### Added
+- **Sigli financial-controls layer** (`sigli/controls`) — give every agent an identity, a scoped wallet, a runtime-enforced policy, and an audit trail.
+  - `ControlPlane` — one object tying identity + wallet + policy + audit together; `authorize()` evaluates a spend, debits the wallet only on approval, and records the outcome. Mirrors the product API (`registerAgent` ≈ `POST /agents`, `setPolicy` ≈ `POST /agents/:id/policy`, `audit` ≈ `GET /agents/:id/audit`).
+  - `evaluatePolicy` — pure, deterministic policy engine: spend limit, velocity cap over a rolling window, approved-counterparty allow-list, escalation threshold. Returns `APPROVED` / `ESCALATED` / `BLOCKED`.
+  - `AgentWallet` — scoped ledger held in integer minor units (cents); cannot overdraw.
+  - `AgentRegistry` — named agent identities with lifecycle status.
+  - `AuditLog` — append-only trail with monotonic seq, `exportJSON` / `exportCSV`, and per-agent summaries.
+  - Optional durable persistence via `persistDir` + `ControlPlane.load(dir)` (atomic writes).
+- `NodeRuntime` now accepts an optional `{ plane, agentId }` so an agent's financial tool calls (`{"tool":"spend",...}` and authorized `uniswap_quote`) are governed and audited before they execute.
+- Subpath export `sigli/controls`.
+
+### Changed
+- **Renamed `shingeki` → `sigli`** (package name, `sigli` bin, repo, brand strings, public `SigliKv`). Repositioned as financial controls for AI agents, layered on the mesh/0G execution engine.
+- Environment-variable prefix is now `SIGLI_`; existing `SHINGEKI_*` variables still work via a startup compatibility shim that mirrors both prefixes.
+
 ## [0.1.1] — 2026-05-03
 
 ### Fixed
